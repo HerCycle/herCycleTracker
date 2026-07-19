@@ -82,14 +82,34 @@ jobs:
             
             # Step 4: Verify health check
             echo "Waiting for service startup..."
-            sleep 15
+            sleep 45
             
             # Check local status
             if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
               echo "Deployment health check PASSED!"
               exit 0
             else
-              echo "Deployment health check FAILED! Initiating rollback..."
+              echo "Deployment health check FAILED!"
+              echo "=== REMOTE SYSTEM DIAGNOSTICS ==="
+              echo "--- systemctl status hercycle ---"
+              sudo systemctl status hercycle --no-pager -l || true
+              echo "--- journalctl -u hercycle -n 150 ---"
+              sudo journalctl -u hercycle -n 150 --no-pager || true
+              echo "--- Port 8080 listener check ---"
+              sudo ss -tlnp | grep 8080 || true
+              echo "--- Environment variable keys ---"
+              if [ -f config/application.env ]; then
+                awk -F= '{print $1}' config/application.env || true
+              else
+                echo "No application.env file found!"
+              fi
+              echo "--- HTTP local health check curl response ---"
+              curl -v http://127.0.0.1:8080/api/health || true
+              echo "--- HTTP local Swagger curl response ---"
+              curl -v http://127.0.0.1:8080/swagger-ui/index.html || true
+              echo "=== END DIAGNOSTICS ==="
+
+              echo "Initiating rollback..."
               
               # Restore from backup
               if [ -f previous/HerCycle.jar ]; then
@@ -99,7 +119,7 @@ jobs:
                 sudo systemctl restart hercycle
                 
                 # Check health of rolled back version
-                sleep 15
+                sleep 45
                 if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
                   echo "Rollback successful. Previous version is running."
                 else
