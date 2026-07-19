@@ -85,7 +85,7 @@ jobs:
             sleep 15
             
             # Check local status
-            if curl -f -s http://127.0.0.1:8080/swagger-ui/swagger-ui/index.html > /dev/null; then
+            if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
               echo "Deployment health check PASSED!"
               exit 0
             else
@@ -100,7 +100,7 @@ jobs:
                 
                 # Check health of rolled back version
                 sleep 15
-                if curl -f -s http://127.0.0.1:8080/swagger-ui/swagger-ui/index.html > /dev/null; then
+                if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
                   echo "Rollback successful. Previous version is running."
                 else
                   echo "Rollback failed! The application is in an unhealthy state."
