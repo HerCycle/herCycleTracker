@@ -423,8 +423,8 @@ The application will start listening on port `8080` container port forwarded loc
 
 
 ## 🔍 Swagger & API Playground
-- **Swagger UI URL**: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
-- **OpenAPI Schema Docs**: [http://localhost:8080/api-docs](http://localhost:8080/api-docs)
+- **Swagger UI URL**:http://52-2-37-31.sslip.io/swagger-ui/index.html
+- **OpenAPI Schema Docs**:http://52-2-37-31.sslip.io/v3/api-docs
 
 ## 📬 Postman Collection
 - The Postman test catalog is exported directly in the root folder: [hercycle_postman_collection.json](file:///c:/Users/vasav/OneDrive/Desktop/Her_Cycle/Backend/hercycle_postman_collection.json).
