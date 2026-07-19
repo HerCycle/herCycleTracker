@@ -29,6 +29,9 @@ $RECYCLE.BIN/
 
 # HerCycle Log and Secret Exclusions
 *.log
+logs/
+*.pem
+build/
 application-local.properties
 .env
 secrets/
