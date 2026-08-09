@@ -1,0 +1,68 @@
+<div class="feedback-container">
+  
+  <div class="feedback-card glass-panel">
+    <div class="header">
+      <span class="material-icons star-brand">rate_review</span>
+      <h3>Share Your Experience</h3>
+      <p class="desc">Help us make HerCycle better. We read every review carefully!</p>
+    </div>
+
+    @if (successMessage()) {
+      <div class="alert alert-success">
+        <span class="material-icons">check_circle_outline</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    @if (errorMessage()) {
+      <div class="alert alert-danger">
+        <span class="material-icons">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <form (submit)="onSubmit(); $event.preventDefault();" class="feedback-form">
+      <div class="rating-selector-group">
+        <label>Overall Experience</label>
+        <div class="stars-row">
+          @for (star of [1, 2, 3, 4, 5]; track star) {
+            <button 
+              type="button" 
+              class="star-btn" 
+              [class.active]="rating() >= star" 
+              (click)="setRating(star)"
+              [title]="star + ' Stars'"
+            >
+              <span class="material-icons">
+                {{ rating() >= star ? 'star' : 'star_border' }}
+              </span>
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="fMsg">Your Review & Comments</label>
+        <textarea 
+          id="fMsg" 
+          rows="5" 
+          placeholder="What features do you love? What can we improve?"
+          [(ngModel)]="message" 
+          name="message"
+          required
+        ></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" [disabled]="isLoading()">
+        @if (isLoading()) {
+          <span class="spinner"></span>
+          <span>Submitting...</span>
+        } @else {
+          <span class="material-icons">send</span>
+          <span>Submit Feedback</span>
+        }
+      </button>
+    </form>
+  </div>
+
+</div>

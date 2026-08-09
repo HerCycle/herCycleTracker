@@ -1,0 +1,102 @@
+<div class="selfcare-container">
+  
+  <!-- Navigation Header tabs -->
+  <div class="selfcare-nav-header glass-panel">
+    <div class="tabs">
+      <button class="tab-btn" [class.active]="currentTab() === 'ALL'" (click)="currentTab.set('ALL')">
+        <span class="material-icons">subscriptions</span>
+        <span>All Self Care</span>
+      </button>
+      <button class="tab-btn" [class.active]="currentTab() === 'BOOKMARKS'" (click)="currentTab.set('BOOKMARKS')">
+        <span class="material-icons">bookmarks</span>
+        <span>My Bookmarks</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Search and Categories Row (Visible on ALL tab) -->
+  @if (currentTab() === 'ALL') {
+    <div class="catalog-filters glass-panel">
+      <div class="search-box">
+        <span class="material-icons">search</span>
+        <input 
+          type="text" 
+          placeholder="Search self care videos..."
+          [(ngModel)]="searchInput"
+          (keyup.enter)="search()"
+        />
+        @if (searchInput()) {
+          <button class="clear-search" (click)="clearSearch()">
+            <span class="material-icons">close</span>
+          </button>
+        }
+      </div>
+
+      <div class="categories-row">
+        <button class="cat-pill" [class.active]="selectedCategory() === ''" (click)="setCategory('')">All</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'NUTRITION'" (click)="setCategory('NUTRITION')">Nutrition</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'EXERCISE'" (click)="setCategory('EXERCISE')">Exercise</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'HYGIENE'" (click)="setCategory('HYGIENE')">Hygiene</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'MEDITATION'" (click)="setCategory('MEDITATION')">Meditation</button>
+      </div>
+    </div>
+  }
+
+  <!-- Video Grid -->
+  <div class="videos-grid">
+    @let list = currentTab() === 'ALL' ? videos() : bookmarks();
+    
+    @if (list.length === 0) {
+      <div class="empty-videos glass-panel">
+        <span class="material-icons">video_library</span>
+        <p>No self-care videos found.</p>
+      </div>
+    } @else {
+      @for (vid of list; track vid.id) {
+        <div class="video-card glass-panel glass-panel-hover" (click)="playVideo(vid)">
+          <div class="video-thumbnail-box">
+            <img [src]="getThumbnail(vid)" (error)="handleImageError($event, vid)" [alt]="vid.title" />
+            <div class="play-overlay">
+              <span class="material-icons play-icon">play_arrow</span>
+            </div>
+            <button type="button" class="bookmark-toggle" (click)="toggleBookmark(vid, $event)" [class.active]="isBookmarked(vid)" title="Bookmark video">
+              <span class="material-icons">{{ isBookmarked(vid) ? 'bookmark' : 'bookmark_border' }}</span>
+            </button>
+          </div>
+
+          <div class="video-details">
+            <span class="video-category">{{ vid.category }}</span>
+            <h4 class="video-title">{{ vid.title }}</h4>
+            <p class="video-desc">{{ vid.description }}</p>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Video Player Iframe Modal -->
+  @if (playingVideo() && safeEmbedUrl()) {
+    <div class="player-overlay" (click)="closeVideoPlayer()">
+      <div class="player-card glass-panel" (click)="$event.stopPropagation()">
+        <div class="player-header">
+          <h3>{{ playingVideo()?.title }}</h3>
+          <button class="close-btn" (click)="closeVideoPlayer()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <div class="player-body">
+          <div class="iframe-container">
+            <iframe 
+              [src]="safeEmbedUrl()!" 
+              frameborder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowfullscreen
+            ></iframe>
+          </div>
+          <p class="desc">{{ playingVideo()?.description }}</p>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

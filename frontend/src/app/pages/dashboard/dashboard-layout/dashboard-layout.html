@@ -1,0 +1,135 @@
+<div class="dashboard-shell" [class.sidebar-open]="isSidebarOpen()" (click)="closeNotificationDropdown()">
+  
+  <!-- Sidebar -->
+  <aside class="sidebar glass-panel" [class.open]="isSidebarOpen()">
+    <div class="sidebar-header">
+      <div class="logo">
+        <img src="assets/logo.jpeg" alt="HerCycle Logo" class="logo-img" />
+        <h2>HerCycle</h2>
+      </div>
+      <button class="mobile-close-btn" (click)="toggleSidebar()">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <ul>
+        <!-- USER / COMMON LINKS -->
+        <li>
+          <a routerLink="/dashboard/home" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="onNavClick()">
+            <span class="material-icons">dashboard</span>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/calendar" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">calendar_month</span>
+            <span>Calendar Log</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/symptoms" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">mood</span>
+            <span>Symptom Tracker</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/reminders" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">alarm</span>
+            <span>Pills & Water</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/shop" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">shopping_bag</span>
+            <span>Organic Store</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/self-care" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">play_circle</span>
+            <span>Self Care</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/partner" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">favorite</span>
+            <span>Partner Portal</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/feedback" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">rate_review</span>
+            <span>Feedback</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/dashboard/profile" routerLinkActive="active" (click)="onNavClick()">
+            <span class="material-icons">person</span>
+            <span>My Profile</span>
+          </a>
+        </li>
+
+        <!-- ADMIN EXCLUSIVE LINK -->
+        @if (user()?.role === 'ROLE_ADMIN') {
+          <li class="admin-nav-item">
+            <a routerLink="/dashboard/admin" routerLinkActive="active" (click)="onNavClick()">
+              <span class="material-icons">admin_panel_settings</span>
+              <span>Admin Console</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-block">
+        <span class="material-icons avatar-placeholder">account_circle</span>
+        <div class="user-details">
+          <p class="user-name">{{ user()?.firstName }} {{ user()?.lastName }}</p>
+          <p class="user-role">{{ user()?.role === 'ROLE_ADMIN' ? 'Administrator' : 'User' }}</p>
+        </div>
+      </div>
+      <button class="logout-btn" (click)="logout()">
+        <span class="material-icons">logout</span>
+        <span>Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Mobile Sidebar Overlay -->
+  @if (isSidebarOpen()) {
+    <div class="sidebar-overlay" (click)="toggleSidebar()"></div>
+  }
+
+  <!-- Main View Container -->
+  <div class="main-content-wrapper">
+    <header class="topbar glass-panel">
+      <div class="topbar-left">
+        <button class="menu-toggle-btn" (click)="toggleSidebar()">
+          <span class="material-icons">menu</span>
+        </button>
+        <h1 class="page-title">
+          @if (activePath().includes('home')) { Welcome Back, {{ user()?.firstName }}! }
+          @else if (activePath().includes('calendar')) { Menstrual Cycle Calendar }
+          @else if (activePath().includes('symptoms')) { Symptoms & Mood Log }
+          @else if (activePath().includes('reminders')) { Pill Reminders & Water Intake }
+          @else if (activePath().includes('shop')) { HerCycle Organic Store }
+          @else if (activePath().includes('self-care')) { Self Care Video Catalog }
+          @else if (activePath().includes('partner')) { Partner Sync & Sharing }
+          @else if (activePath().includes('feedback')) { Rate Our Platform }
+          @else if (activePath().includes('profile')) { Profile & Security }
+          @else if (activePath().includes('admin')) { Administrative Management }
+        </h1>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Notification symbol removed as requested -->
+      </div>
+    </header>
+
+    <main class="page-viewport">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

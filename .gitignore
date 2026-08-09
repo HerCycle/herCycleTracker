@@ -1,0 +1,13 @@
+# IDE/Agent folders
+brain/
+.idea/
+.vscode/
+
+# Build and dependency folders
+node_modules/
+target/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db

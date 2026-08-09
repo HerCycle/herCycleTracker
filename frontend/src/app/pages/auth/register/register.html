@@ -1,0 +1,216 @@
+<div class="auth-container">
+  <div class="auth-card glass-panel">
+    <div class="auth-header">
+      <div class="logo">
+        <img src="assets/logo.jpeg" alt="HerCycle Logo" class="logo-img" />
+        <h1>HerCycle</h1>
+      </div>
+      <p class="subtitle">Step {{ currentStep() }} of 2: {{ currentStep() === 1 ? 'Create Account' : 'Health Profile' }}</p>
+      
+      <div class="step-indicator">
+        <div class="step" [class.active]="currentStep() >= 1"></div>
+        <div class="step" [class.active]="currentStep() >= 2"></div>
+      </div>
+    </div>
+
+    @if (errorMessage()) {
+      <div class="alert alert-danger">
+        <span class="material-icons">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    @if (successMessage()) {
+      <div class="alert alert-success">
+        <span class="material-icons">check_circle_outline</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    <form (submit)="onSubmit(); $event.preventDefault();" class="auth-form">
+      
+      <!-- STEP 1: ACCOUNT DETAILS -->
+      @if (currentStep() === 1) {
+        <div class="form-step-content">
+          <div class="grid-layout">
+            <div class="input-group">
+              <label for="firstName">First Name *</label>
+              <input 
+                type="text" 
+                id="firstName" 
+                name="firstName" 
+                placeholder="Jane"
+                [ngModel]="firstName()"
+                (ngModelChange)="firstName.set($event)"
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label for="lastName">Last Name *</label>
+              <input 
+                type="text" 
+                id="lastName" 
+                name="lastName" 
+                placeholder="Doe"
+                [ngModel]="lastName()"
+                (ngModelChange)="lastName.set($event)"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="email">Email Address *</label>
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              placeholder="jane@example.com"
+              [ngModel]="email()"
+              (ngModelChange)="email.set($event)"
+              required
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="phone">Phone Number</label>
+            <input 
+              type="tel" 
+              id="phone" 
+              name="phone" 
+              placeholder="1234567890"
+              [ngModel]="phone()"
+              (ngModelChange)="phone.set($event)"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="password">Password *</label>
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              placeholder="Min 6 characters"
+              [ngModel]="password()"
+              (ngModelChange)="password.set($event)"
+              required
+            />
+          </div>
+
+          <button type="button" class="btn btn-primary btn-block" (click)="nextStep()">
+            <span>Continue</span>
+            <span class="material-icons">arrow_forward</span>
+          </button>
+        </div>
+      }
+
+      <!-- STEP 2: HEALTH DETAILS -->
+      @if (currentStep() === 2) {
+        <div class="form-step-content">
+          <div class="input-group">
+            <label for="dob">Date of Birth</label>
+            <input 
+              type="date" 
+              id="dob" 
+              name="dob" 
+              [ngModel]="dateOfBirth()"
+              (ngModelChange)="dateOfBirth.set($event)"
+            />
+          </div>
+
+          <div class="grid-layout">
+            <div class="input-group">
+              <label for="height">Height (cm)</label>
+              <input 
+                type="number" 
+                id="height" 
+                name="height" 
+                placeholder="165"
+                [ngModel]="height()"
+                (ngModelChange)="height.set($event)"
+                min="30"
+              />
+            </div>
+            <div class="input-group">
+              <label for="weight">Weight (kg)</label>
+              <input 
+                type="number" 
+                id="weight" 
+                name="weight" 
+                placeholder="60"
+                [ngModel]="weight()"
+                (ngModelChange)="weight.set($event)"
+                min="5"
+              />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="bloodGroup">Blood Group</label>
+            <select 
+              id="bloodGroup" 
+              name="bloodGroup" 
+              [ngModel]="bloodGroup()"
+              (ngModelChange)="bloodGroup.set($event)"
+            >
+              <option value="">Select blood group</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+
+          <div class="switches-container">
+            <div class="checkbox-group">
+              <input 
+                type="checkbox" 
+                id="pregnancyStatus" 
+                name="pregnancyStatus"
+                [ngModel]="pregnancyStatus()"
+                (ngModelChange)="pregnancyStatus.set($event)"
+              />
+              <label for="pregnancyStatus">Currently Pregnant</label>
+            </div>
+
+            <div class="checkbox-group">
+              <input 
+                type="checkbox" 
+                id="notificationsEnabled" 
+                name="notificationsEnabled"
+                [ngModel]="notificationsEnabled()"
+                (ngModelChange)="notificationsEnabled.set($event)"
+              />
+              <label for="notificationsEnabled">Enable Reminders & Notifications</label>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="button" class="btn btn-outline" (click)="prevStep()">
+              <span class="material-icons">arrow_back</span>
+              <span>Back</span>
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
+              @if (isLoading()) {
+                <span class="spinner"></span>
+                <span>Creating...</span>
+              } @else {
+                <span>Sign Up</span>
+                <span class="material-icons">done</span>
+              }
+            </button>
+          </div>
+        </div>
+      }
+
+    </form>
+
+    <div class="auth-footer">
+      <p>Already have an account? <a routerLink="/login" class="signup-link">Sign In</a></p>
+    </div>
+  </div>
+</div>

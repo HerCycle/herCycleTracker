@@ -1,0 +1,336 @@
+<div class="reminders-layout">
+  
+  <!-- Toast Notification Alert -->
+  @if (toastMessage()) {
+    <div class="toast-banner glass-panel">
+      <span class="material-icons">notifications_active</span>
+      <span>{{ toastMessage() }}</span>
+    </div>
+  }
+
+  <!-- Left Column: Medication Reminders -->
+  <div class="meds-section glass-panel">
+    <div class="section-header">
+      <div class="header-left">
+        <h3>Medication & Supplement Reminders</h3>
+        <p class="subtitle">Stay consistent with daily supplements and cycle health prescriptions</p>
+      </div>
+
+      <button class="btn btn-primary btn-add-pill" (click)="openAddModal()">
+        <span class="material-icons">add_circle</span>
+        <span>Add Reminder</span>
+      </button>
+    </div>
+
+    <!-- Filter Pills Bar -->
+    <div class="filter-tabs-row">
+      <button class="filter-btn" [class.active]="filterTab() === 'ALL'" (click)="filterTab.set('ALL')">
+        All ({{ reminders().length }})
+      </button>
+      <button class="filter-btn" [class.active]="filterTab() === 'ACTIVE'" (click)="filterTab.set('ACTIVE')">
+        Pending
+      </button>
+      <button class="filter-btn" [class.active]="filterTab() === 'COMPLETED'" (click)="filterTab.set('COMPLETED')">
+        Taken Today
+      </button>
+    </div>
+
+    <div class="reminders-grid">
+      @if (filteredReminders().length === 0) {
+        <div class="empty-state">
+          <span class="material-icons empty-icon">alarm_off</span>
+          <h4>No medication reminders found</h4>
+          <p>Tap "Add Reminder" above to set up daily supplement or pill tracking.</p>
+        </div>
+      } @else {
+        @for (med of filteredReminders(); track med.id) {
+          <div class="reminder-card glass-panel" [class.completed-card]="med.completed">
+            <div class="card-left">
+              <button 
+                class="take-check-btn" 
+                [class.checked]="med.completed"
+                (click)="toggleReminderCompleted(med)"
+                [title]="med.completed ? 'Mark as Not Taken' : 'Mark as Taken Today'"
+              >
+                <span class="material-icons">{{ med.completed ? 'check_circle' : 'radio_button_unchecked' }}</span>
+              </button>
+
+              <div class="reminder-info">
+                <div class="title-row">
+                  <h4>{{ med.medicineName }}</h4>
+                  <span class="status-chip" [class.done]="med.completed">
+                    {{ med.completed ? 'Taken Today' : 'Pending' }}
+                  </span>
+                </div>
+
+                <p class="dose">{{ med.dosage || '1 dose' }} • <span class="freq-tag">{{ med.frequency }}</span></p>
+                
+                <div class="meta-row">
+                  <span class="time-tag">
+                    <span class="material-icons">schedule</span>
+                    <span>{{ med.time }}</span>
+                  </span>
+                  <span class="dates-tag">Active: {{ med.startDate | date:'mediumDate' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-right-actions">
+              <button class="action-icon-btn edit" (click)="openEditModal(med)" title="Edit Reminder">
+                <span class="material-icons">edit</span>
+              </button>
+              <button class="action-icon-btn delete" (click)="deleteReminder(med.id)" title="Delete Reminder">
+                <span class="material-icons">delete</span>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Right Column: Interactive Water Intake Manager -->
+  <div class="water-section glass-panel">
+    <div class="section-header">
+      <div class="header-left">
+        <h3>Hydration Manager</h3>
+        <p class="subtitle">Track daily water intake for balanced cycle health</p>
+      </div>
+      <button class="btn btn-outline btn-sm reset-btn" (click)="resetWaterToday()" title="Reset Today's Intake">
+        <span class="material-icons">refresh</span>
+        <span>Reset</span>
+      </button>
+    </div>
+
+    <!-- Progress Card -->
+    <div class="water-progress-card glass-panel" [class.goal-achieved]="isWaterGoalReached()">
+      <div class="progress-header-row">
+        <div class="water-stats">
+          <span class="total-liters">{{ (waterCompletedMl() / 1000) | number:'1.2-2' }} L</span>
+          <span class="goal-target">of {{ (waterGoalMl() / 1000) | number:'1.1-1' }} L Daily Goal</span>
+        </div>
+        <div class="pct-badge">
+          <span>{{ waterPercentage() }}%</span>
+        </div>
+      </div>
+
+      <!-- Linear Fill Bar -->
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" [style.width.%]="waterPercentage()"></div>
+      </div>
+
+      @if (isWaterGoalReached()) {
+        <div class="goal-banner">
+          <span class="material-icons">stars</span>
+          <span>🎉 Daily Hydration Goal Achieved! Fantastic job staying hydrated!</span>
+        </div>
+      }
+    </div>
+
+    <!-- Quick Add Hydration Buttons -->
+    <div class="quick-add-section">
+      <h4>Quick Add Water</h4>
+      <div class="quick-buttons-grid">
+        <button class="btn-water-quick" (click)="addWater(250)">
+          <span class="icon">🥛</span>
+          <span class="label">+250 ml</span>
+          <span class="desc">Glass</span>
+        </button>
+
+        <button class="btn-water-quick" (click)="addWater(500)">
+          <span class="icon">🍼</span>
+          <span class="label">+500 ml</span>
+          <span class="desc">Bottle</span>
+        </button>
+
+        <button class="btn-water-quick" (click)="addWater(750)">
+          <span class="icon">🥤</span>
+          <span class="label">+750 ml</span>
+          <span class="desc">Flask</span>
+        </button>
+
+        <button class="btn-water-quick" (click)="addWater(1000)">
+          <span class="icon">🫖</span>
+          <span class="label">+1000 ml</span>
+          <span class="desc">Pitcher</span>
+        </button>
+      </div>
+
+      <!-- Custom Amount Row -->
+      <div class="custom-add-row">
+        <div class="input-with-label">
+          <input 
+            type="number" 
+            [(ngModel)]="customWaterInputMl" 
+            placeholder="250" 
+            min="50" 
+            max="2000" 
+            step="50" 
+            class="custom-ml-input"
+          />
+          <span class="unit">ml</span>
+        </div>
+        <button class="btn btn-primary btn-add-custom" (click)="addWater(customWaterInputMl())">
+          <span class="material-icons">water_drop</span>
+          <span>Add Water</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Set Daily Goal Settings -->
+    <div class="water-setup-card glass-panel">
+      <h4>Set Daily Hydration Goal</h4>
+      <div class="goal-input-row">
+        <input 
+          type="number" 
+          id="waterGoalInput" 
+          [(ngModel)]="inputWaterGoalLiters" 
+          step="0.1" 
+          min="0.5" 
+          max="10" 
+          class="goal-num-input"
+        />
+        <span class="unit-label">Liters / day</span>
+        <button class="btn btn-primary" (click)="saveWaterGoal()">
+          <span class="material-icons">save</span>
+          <span>Save Goal</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Today's Drink Logs -->
+    <div class="water-logs-section">
+      <h4>Today's Hydration Entries</h4>
+      @if (waterLogs().length === 0) {
+        <div class="empty-history">
+          <p>No drinks logged today yet. Tap any quick add button above!</p>
+        </div>
+      } @else {
+        <div class="logs-list">
+          @for (log of waterLogs(); track log.id) {
+            <div class="log-item glass-panel">
+              <div class="log-left">
+                <span class="material-icons drop-icon">water_drop</span>
+                <div class="log-info">
+                  <span class="log-amount">+{{ log.amount }} ml</span>
+                  <span class="log-time">{{ log.time }}</span>
+                </div>
+              </div>
+              <button class="btn-delete-log" (click)="deleteWaterLog(log.id)" title="Remove Entry">
+                <span class="material-icons">close</span>
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+  </div>
+
+  <!-- Medicine Modal -->
+  @if (isModalOpen()) {
+    <div class="modal-overlay" (click)="closeModal()">
+      <div class="modal-card glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ selectedReminder() ? 'Edit Medication Reminder' : 'Add Medication Reminder' }}</h3>
+          <button class="close-btn" (click)="closeModal()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger">
+              <span class="material-icons">error_outline</span>
+              <span>{{ errorMessage() }}</span>
+            </div>
+          }
+
+          <!-- Presets Quick Choice -->
+          <div class="presets-section">
+            <label class="preset-title">Quick Select Preset Medication:</label>
+            <div class="preset-chips">
+              @for (preset of presets; track preset.name) {
+                <button class="chip-btn" (click)="applyPreset(preset)">
+                  + {{ preset.name }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="medName">Medicine / Supplement Name *</label>
+            <input 
+              type="text" 
+              id="medName" 
+              placeholder="e.g. Organic Iron & Vitamin C"
+              [(ngModel)]="medicineName" 
+              required
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="dosageInput">Dosage Description</label>
+            <input 
+              type="text" 
+              id="dosageInput" 
+              placeholder="e.g. 1 Capsule (50mg) / 2 Gummies"
+              [(ngModel)]="dosage" 
+            />
+          </div>
+
+          <div class="grid-layout">
+            <div class="input-group">
+              <label for="reminderTime">Time *</label>
+              <input 
+                type="time" 
+                id="reminderTime" 
+                [(ngModel)]="time" 
+                required
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="reminderFreq">Frequency</label>
+              <select id="reminderFreq" [(ngModel)]="frequency">
+                <option value="DAILY">Daily</option>
+                <option value="WEEKLY">Weekly</option>
+                <option value="MONTHLY">Monthly</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-layout">
+            <div class="input-group">
+              <label for="startDateInput">Start Date *</label>
+              <input 
+                type="date" 
+                id="startDateInput" 
+                [(ngModel)]="startDate" 
+                required
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="endDateInput">End Date (Optional)</label>
+              <input 
+                type="date" 
+                id="endDateInput" 
+                [(ngModel)]="endDate" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="btn btn-primary" (click)="saveReminder()">
+            <span class="material-icons">save</span>
+            <span>Save Reminder</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

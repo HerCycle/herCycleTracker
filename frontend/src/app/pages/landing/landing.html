@@ -1,0 +1,15 @@
+<div class="intro-splash-screen" (click)="proceed()">
+  <div class="splash-content">
+    <!-- Centered HerCycle Animated Letter Reveal -->
+    <div class="splash-letters">
+      @for (letter of introLetters; track $index) {
+        <span 
+          class="intro-char" 
+          [style.animation-delay]="$index * 0.12 + 's, ' + (1.2 + $index * 0.08) + 's, ' + (1.8 + $index * 0.1) + 's'"
+        >
+          {{ letter }}
+        </span>
+      }
+    </div>
+  </div>
+</div>

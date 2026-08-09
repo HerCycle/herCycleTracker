@@ -1,0 +1,239 @@
+<div class="profile-layout">
+  
+  <!-- Left Side: Profile Details -->
+  <div class="profile-info-section glass-panel">
+    <div class="section-header">
+      <h3>Personal Profile</h3>
+      @if (!isEditing()) {
+        <button class="btn btn-outline btn-sm" (click)="enableEdit()">
+          <span class="material-icons">edit</span> Edit Details
+        </button>
+      }
+    </div>
+
+    @if (successMessage()) {
+      <div class="alert alert-success">
+        <span class="material-icons">check_circle_outline</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    @if (errorMessage()) {
+      <div class="alert alert-danger">
+        <span class="material-icons">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <form (submit)="saveProfile(); $event.preventDefault();" class="profile-form">
+      <div class="grid-layout">
+        <div class="input-group">
+          <label for="pFirst">First Name *</label>
+          <input 
+            type="text" 
+            id="pFirst" 
+            [(ngModel)]="firstName" 
+            name="firstName"
+            [disabled]="!isEditing()" 
+            required
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="pLast">Last Name *</label>
+          <input 
+            type="text" 
+            id="pLast" 
+            [(ngModel)]="lastName" 
+            name="lastName"
+            [disabled]="!isEditing()" 
+            required
+          />
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="pPhone">Phone Number</label>
+        <input 
+          type="tel" 
+          id="pPhone" 
+          [(ngModel)]="phone" 
+          name="phone"
+          [disabled]="!isEditing()" 
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="pDob">Date of Birth</label>
+        <input 
+          type="date" 
+          id="pDob" 
+          [(ngModel)]="dateOfBirth" 
+          name="dateOfBirth"
+          [disabled]="!isEditing()" 
+        />
+      </div>
+
+      <div class="grid-3">
+        <div class="input-group">
+          <label for="pHeight">Height (cm)</label>
+          <input 
+            type="number" 
+            id="pHeight" 
+            [(ngModel)]="height" 
+            name="height"
+            [disabled]="!isEditing()" 
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="pWeight">Weight (kg)</label>
+          <input 
+            type="number" 
+            id="pWeight" 
+            [(ngModel)]="weight" 
+            name="weight"
+            [disabled]="!isEditing()" 
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="pBlood">Blood Group</label>
+          <select 
+            id="pBlood" 
+            [(ngModel)]="bloodGroup" 
+            name="bloodGroup"
+            [disabled]="!isEditing()"
+          >
+            <option value="">Select group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="switches-box">
+        <div class="checkbox-group">
+          <input 
+            type="checkbox" 
+            id="pPreg" 
+            [(ngModel)]="pregnancyStatus" 
+            name="pregnancyStatus"
+            [disabled]="!isEditing()"
+          />
+          <label for="pPreg">Pregnancy Status (Currently Pregnant)</label>
+        </div>
+
+        <div class="checkbox-group">
+          <input 
+            type="checkbox" 
+            id="pNotif" 
+            [(ngModel)]="notificationsEnabled" 
+            name="notificationsEnabled"
+            [disabled]="!isEditing()"
+          />
+          <label for="pNotif">Enable Health Reminders & Notifications</label>
+        </div>
+      </div>
+
+      @if (isEditing()) {
+        <div class="button-row">
+          <button type="button" class="btn btn-outline" (click)="cancelEdit()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) {
+              <span class="spinner"></span>
+              <span>Saving...</span>
+            } @else {
+              <span>Save Changes</span>
+            }
+          </button>
+        </div>
+      }
+    </form>
+  </div>
+
+  <!-- Right Side: Security, Password & Danger Area -->
+  <div class="profile-security-section">
+    
+    <!-- Change Password -->
+    <div class="glass-panel security-card">
+      <h3>Change Password</h3>
+      
+      @if (pSuccessMessage()) {
+        <div class="alert alert-success">
+          <span class="material-icons">check_circle_outline</span>
+          <span>{{ pSuccessMessage() }}</span>
+        </div>
+      }
+
+      @if (pErrorMessage()) {
+        <div class="alert alert-danger">
+          <span class="material-icons">error_outline</span>
+          <span>{{ pErrorMessage() }}</span>
+        </div>
+      }
+
+      <form (submit)="changePassword(); $event.preventDefault();" class="security-form">
+        <div class="input-group">
+          <label for="oldPass">Current Password</label>
+          <input 
+            type="password" 
+            id="oldPass" 
+            [(ngModel)]="currentPassword" 
+            name="currentPassword" 
+            required 
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="newPass">New Password</label>
+          <input 
+            type="password" 
+            id="newPass" 
+            [(ngModel)]="newPassword" 
+            name="newPassword" 
+            required 
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="confPass">Confirm New Password</label>
+          <input 
+            type="password" 
+            id="confPass" 
+            [(ngModel)]="confirmPassword" 
+            name="confirmPassword" 
+            required 
+          />
+        </div>
+
+        <button type="submit" class="btn btn-secondary btn-block" [disabled]="isChangingPassword()">
+          @if (isChangingPassword()) {
+            <span class="spinner"></span>
+            <span>Updating...</span>
+          } @else {
+            <span>Update Password</span>
+          }
+        </button>
+      </form>
+    </div>
+
+    <!-- Danger Area -->
+    <div class="glass-panel danger-card">
+      <h3>Danger Zone</h3>
+      <p class="desc">Deleting your account will permanently remove all logged details, including cycle histories, water trends, self-care records, and address details. This action cannot be undone.</p>
+      <button class="btn btn-outline danger-zone-btn btn-block" (click)="deleteAccount()">
+        <span class="material-icons">delete_forever</span>
+        <span>Delete HerCycle Account</span>
+      </button>
+    </div>
+
+  </div>
+
+</div>

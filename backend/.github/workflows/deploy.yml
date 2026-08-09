@@ -1,0 +1,134 @@
+name: Deploy HerCycle Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn -B clean package -DskipTests
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hercycle-jar
+          path: target/HerCycle-0.0.1-SNAPSHOT.jar
+          retention-days: 1
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hercycle-jar
+          path: target-artifact
+
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: 'placeholder'
+          if_key_exists: replace
+
+      - name: Add host key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy JAR to Server and Deploy
+        run: |
+          # Copy target JAR to the server as a new candidate
+          scp target-artifact/HerCycle-0.0.1-SNAPSHOT.jar ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/hercycle/current/HerCycle.jar.new
+
+          # Execute deployment script on the remote server
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -s' << 'EOF'
+            set -e
+            echo "Starting deployment execution on remote server..."
+            
+            # Navigate to workspace
+            cd /var/www/hercycle
+            
+            # Step 1: Backup current JAR if it exists
+            if [ -f current/HerCycle.jar ]; then
+              echo "Backing up current active JAR..."
+              cp current/HerCycle.jar previous/HerCycle.jar
+            fi
+
+            # Step 2: Swap new candidate JAR
+            echo "Promoting new candidate JAR..."
+            mv current/HerCycle.jar.new current/HerCycle.jar
+
+            # Step 3: Restart systemd service
+            echo "Restarting hercycle.service..."
+            sudo systemctl restart hercycle
+            
+            # Step 4: Verify health check
+            echo "Waiting for service startup..."
+            sleep 45
+            
+            # Check local status
+            if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
+              echo "Deployment health check PASSED!"
+              exit 0
+            else
+              echo "Deployment health check FAILED!"
+              echo "=== REMOTE SYSTEM DIAGNOSTICS ==="
+              echo "--- systemctl status hercycle ---"
+              sudo systemctl status hercycle --no-pager -l || true
+              echo "--- journalctl -u hercycle -n 150 ---"
+              sudo journalctl -u hercycle -n 150 --no-pager || true
+              echo "--- Port 8080 listener check ---"
+              sudo ss -tlnp | grep 8080 || true
+              echo "--- Environment variable keys ---"
+              if [ -f config/application.env ]; then
+                awk -F= '{print $1}' config/application.env || true
+              else
+                echo "No application.env file found!"
+              fi
+              echo "--- HTTP local health check curl response ---"
+              curl -v http://127.0.0.1:8080/api/health || true
+              echo "--- HTTP local Swagger curl response ---"
+              curl -v http://127.0.0.1:8080/swagger-ui/index.html || true
+              echo "=== END DIAGNOSTICS ==="
+
+              echo "Initiating rollback..."
+              
+              # Restore from backup
+              if [ -f previous/HerCycle.jar ]; then
+                echo "Restoring previous JAR from backup..."
+                cp previous/HerCycle.jar current/HerCycle.jar
+                echo "Restarting hercycle.service with rolled back version..."
+                sudo systemctl restart hercycle
+                
+                # Check health of rolled back version
+                sleep 45
+                if curl -f -s http://127.0.0.1:8080/swagger-ui/index.html > /dev/null; then
+                  echo "Rollback successful. Previous version is running."
+                else
+                  echo "Rollback failed! The application is in an unhealthy state."
+                fi
+              else
+                echo "No previous backup JAR found to rollback to."
+              fi
+              
+              exit 1
+            fi
+          EOF

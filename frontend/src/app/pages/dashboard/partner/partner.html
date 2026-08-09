@@ -1,0 +1,116 @@
+<div class="partner-container">
+  
+  <!-- Status Cards -->
+  <div class="partner-card glass-panel">
+    <h3>Partner Synchronization</h3>
+    <p class="description-text">Sync your self-care timeline and menstrual predictions with your partner to foster better communication and shared wellness.</p>
+
+    <!-- CASE 1: NO PARTNER CONNECTED -->
+    @if (partner() === null) {
+      <div class="connection-action-box">
+        <div class="empty-state">
+          <span class="material-icons connect-icon">link_off</span>
+          <p>No partner synced yet</p>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="alert alert-danger">
+            <span class="material-icons">error_outline</span>
+            <span>{{ errorMessage() }}</span>
+          </div>
+        }
+
+        <div class="invite-form">
+          <div class="input-group">
+            <label for="pEmail">Invite Partner by Email</label>
+            <input 
+              type="email" 
+              id="pEmail" 
+              placeholder="partner@example.com" 
+              [(ngModel)]="inviteEmail" 
+            />
+          </div>
+          <button class="btn btn-primary" (click)="sendInvite()" [disabled]="isLoading()">
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              <span>Sending...</span>
+            } @else {
+              <span class="material-icons">send</span>
+              <span>Send Invitation</span>
+            }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- CASE 2: PENDING INVITATION -->
+    @if (partner() !== null && partner()?.status === 'PENDING') {
+      <div class="pending-connection-box">
+        <span class="material-icons pending-icon">hourglass_empty</span>
+        <div class="pending-info">
+          <h4>Sync Request Pending</h4>
+          <p>Partner Email: <strong>{{ partner()?.partnerEmail }}</strong></p>
+          <p class="date">Sent on: {{ partner()?.inviteDate | date:'medium' }}</p>
+        </div>
+
+        <div class="button-row">
+          <!-- We show accept/reject option and cancel option -->
+          <button class="btn btn-primary" (click)="acceptInvite()">
+            <span class="material-icons">check</span> Accept Invite
+          </button>
+          <button class="btn btn-outline" (click)="rejectInvite()">
+            <span class="material-icons">close</span> Reject / Ignore
+          </button>
+          <button class="btn btn-text danger-btn" (click)="disconnectPartner()">
+            Cancel Invitation
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- CASE 3: ACCEPTED ACTIVE CONNECTION -->
+    @if (partner() !== null && partner()?.status === 'ACCEPTED') {
+      <div class="active-connection-box">
+        <div class="partner-meta">
+          <span class="material-icons active-icon">favorite</span>
+          <div class="partner-details">
+            <h4>Successfully Synced</h4>
+            <p>Connected with: <strong>{{ partner()?.partnerEmail }}</strong></p>
+            <p class="date">Synced on: {{ partner()?.acceptedDate | date:'mediumDate' }}</p>
+          </div>
+        </div>
+
+        <button class="btn btn-outline danger-btn" (click)="disconnectPartner()">
+          <span class="material-icons">link_off</span> Disconnect
+        </button>
+      </div>
+    }
+
+  </div>
+
+  <!-- Shared Health Summary Dashboard (only visible when ACCEPTED) -->
+  @if (partner() !== null && partner()?.status === 'ACCEPTED') {
+    <div class="shared-dashboard glass-panel">
+      <h3>Shared Wellness Summary</h3>
+      
+      <div class="grid-2">
+        <div class="shared-widget glass-panel">
+          <span class="material-icons widget-icon period">water_drop</span>
+          <div class="widget-details">
+            <p class="label">Cycle Phase</p>
+            <p class="val">{{ sharedPhase() }}</p>
+          </div>
+        </div>
+
+        <div class="shared-widget glass-panel">
+          <span class="material-icons widget-icon forecast">event</span>
+          <div class="widget-details">
+            <p class="label">Forecasted Start</p>
+            <p class="val">{{ sharedNextPeriod() }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

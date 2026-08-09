@@ -1,0 +1,245 @@
+<div class="calendar-container">
+
+  <!-- Toast Notification Banner -->
+  @if (toastMessage()) {
+    <div class="toast-banner glass-panel">
+      <span class="material-icons">event_available</span>
+      <span>{{ toastMessage() }}</span>
+    </div>
+  }
+  
+  <!-- Left Side: Interactive Calendar Grid -->
+  <div class="calendar-left glass-panel">
+    
+    <div class="calendar-header">
+      <button class="nav-btn" (click)="prevMonth()" title="Previous Month">
+        <span class="material-icons">chevron_left</span>
+      </button>
+      <h2>{{ monthNames[currentMonth()] }} {{ currentYear() }}</h2>
+      <button class="nav-btn" (click)="nextMonth()" title="Next Month">
+        <span class="material-icons">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- Legend -->
+    <div class="calendar-legend">
+      <div class="legend-item"><span class="color-dot period"></span><span>Logged Period</span></div>
+      <div class="legend-item"><span class="color-dot predicted"></span><span>Predicted Period</span></div>
+      <div class="legend-item"><span class="color-dot ovulation"></span><span>Ovulation Day</span></div>
+      <div class="legend-item"><span class="color-dot fertile"></span><span>Fertile Window</span></div>
+      <div class="legend-item"><span class="color-dot safe"></span><span>Safe Days</span></div>
+    </div>
+
+    <!-- Weekday titles -->
+    <div class="weekdays-grid">
+      @for (day of weekDays; track day) {
+        <div class="weekday">{{ day }}</div>
+      }
+    </div>
+
+    <!-- Days grid -->
+    <div class="days-grid">
+      @for (day of calendarDays(); track day.dateStr) {
+        <div 
+          class="day-cell" 
+          (click)="onDayCellClick(day)"
+          [class.not-current]="!day.isCurrentMonth"
+          [class.has-period]="day.isPeriod"
+          [class.has-predicted]="day.isPredicted"
+          [class.has-ovulation]="day.isOvulation"
+          [class.has-fertile]="day.isFertile"
+          [class.has-safe]="day.isSafe"
+          [title]="day.isPeriod ? 'Logged Period Date' : day.isOvulation ? 'Predicted Ovulation Day' : 'Click to log period on ' + day.dateStr"
+        >
+          <span class="day-num">{{ day.dayNum }}</span>
+          
+          <!-- Indicators dots below numbers -->
+          <div class="cell-dots">
+            @if (day.isPeriod) { <span class="dot period"></span> }
+            @if (day.isPredicted) { <span class="dot predicted"></span> }
+            @if (day.isOvulation) { <span class="dot ovulation"></span> }
+            @if (day.isFertile && !day.isPeriod && !day.isPredicted) { <span class="dot fertile"></span> }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Right Side: Cycle Summary & Log History -->
+  <div class="calendar-right glass-panel">
+    
+    <!-- Cycle Insights Summary Box -->
+    <div class="cycle-summary-card glass-panel">
+      <h4>Cycle Insights & Predictions</h4>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Next Period</span>
+          <span class="stat-val primary-text">
+            @if (daysUntilNextPeriod() !== null) {
+              {{ daysUntilNextPeriod() }} Days
+            } @else {
+              Pending
+            }
+          </span>
+          <span class="stat-sub">{{ nextPeriodDate() | date:'mediumDate' }}</span>
+        </div>
+
+        <div class="stat-box">
+          <span class="stat-label">Avg Cycle</span>
+          <span class="stat-val">{{ avgCycleLength() }} Days</span>
+          <span class="stat-sub">Regular Rhythm</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="history-header">
+      <h3>Cycle Log History</h3>
+      <button class="btn btn-primary btn-sm btn-add-log" (click)="openAddLogModal()">
+        <span class="material-icons">add_circle</span>
+        <span>Log Period</span>
+      </button>
+    </div>
+
+    <div class="history-list">
+      @if (periodLogs().length === 0) {
+        <div class="empty-history">
+          <span class="material-icons empty-icon">history_toggle_off</span>
+          <h4>No cycle logs found</h4>
+          <p>Tap "Log Period" above or click any date on the calendar to record your cycle!</p>
+        </div>
+      } @else {
+        @for (log of periodLogs(); track log.id) {
+          <div class="history-item glass-panel">
+            <div class="item-main">
+              <span class="material-icons cycle-icon">water_drop</span>
+              <div class="item-dates">
+                <p class="dates-range">
+                  {{ log.periodStartDate | date:'mediumDate' }} 
+                  @if (log.periodEndDate) {
+                    – {{ log.periodEndDate | date:'mediumDate' }}
+                  } @else {
+                    (In Progress)
+                  }
+                </p>
+                <div class="flow-notes">
+                  @if (log.flow) {
+                    <span class="flow-chip">{{ log.flow }} FLOW</span>
+                  }
+                  <span class="cycle-chip">{{ log.cycleLength || 28 }}D CYCLE</span>
+                  @if (log.notes) {
+                    <span class="notes-text">"{{ log.notes }}"</span>
+                  }
+                </div>
+              </div>
+            </div>
+            
+            <div class="item-actions">
+              <button class="action-icon-btn edit" (click)="openEditLogModal(log); $event.stopPropagation();" title="Edit Log">
+                <span class="material-icons">edit</span>
+              </button>
+              <button class="action-icon-btn delete" (click)="deleteLog(log.id); $event.stopPropagation();" title="Delete Log">
+                <span class="material-icons">delete</span>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Log Period Modal -->
+  @if (isLogModalOpen()) {
+    <div class="modal-overlay" (click)="closeLogModal()">
+      <div class="modal-card glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ selectedLog() ? 'Edit Menstrual Log' : 'Log Menstrual Period' }}</h3>
+          <button class="close-btn" (click)="closeLogModal()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger">
+              <span class="material-icons">error_outline</span>
+              <span>{{ errorMessage() }}</span>
+            </div>
+          }
+
+          <div class="input-group">
+            <label for="startDate">Period Start Date *</label>
+            <input 
+              type="date" 
+              id="startDate" 
+              [ngModel]="startDate()"
+              (ngModelChange)="startDate.set($event)"
+              required
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="endDate">Period End Date (Optional)</label>
+            <input 
+              type="date" 
+              id="endDate" 
+              [ngModel]="endDate()"
+              (ngModelChange)="endDate.set($event)"
+            />
+          </div>
+
+          <!-- Cycle & Period Length Controls -->
+          <div class="grid-layout">
+            <div class="input-group">
+              <label for="cycleLen">Cycle Length (Days) *</label>
+              <input 
+                type="number" 
+                id="cycleLen" 
+                [ngModel]="cycleLength()"
+                (ngModelChange)="cycleLength.set($event)"
+                min="20"
+                max="45"
+                placeholder="28"
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="periodLen">Period Duration (Days)</label>
+              <input 
+                type="number" 
+                id="periodLen" 
+                [ngModel]="periodLength()"
+                (ngModelChange)="periodLength.set($event)"
+                min="1"
+                max="10"
+                placeholder="5"
+              />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="flow">Flow Intensity</label>
+            <select 
+              id="flow" 
+              [ngModel]="flow()"
+              (ngModelChange)="flow.set($event)"
+            >
+              <option value="LIGHT">Light</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HEAVY">Heavy</option>
+              <option value="SPOTTING">Spotting</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeLogModal()">Cancel</button>
+          <button class="btn btn-primary" (click)="saveLog()">
+            <span class="material-icons">save</span>
+            <span>Save Log</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

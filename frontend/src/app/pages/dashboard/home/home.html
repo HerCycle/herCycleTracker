@@ -1,0 +1,227 @@
+<div class="home-grid">
+  
+  <!-- Left Side: Cycle Ring & Health Stats -->
+  <div class="column-left">
+    
+    <!-- Cycle Phase Card -->
+    <div class="glass-panel cycle-card">
+      <div class="card-header-simple">
+        <h3>Current Cycle Status</h3>
+        <span class="badge badge-primary">{{ cyclePhase() }}</span>
+      </div>
+
+      <div class="cycle-ring-container">
+        <!-- SVG Circular Progress -->
+        <svg class="progress-ring" width="220" height="220">
+          <circle 
+            class="progress-ring__circle-bg" 
+            stroke="rgba(255, 100, 128, 0.1)" 
+            stroke-width="12" 
+            fill="transparent" 
+            r="90" 
+            cx="110" 
+            cy="110"
+          />
+          <circle 
+            class="progress-ring__circle" 
+            stroke="url(#roseGradient)" 
+            stroke-width="14" 
+            stroke-linecap="round"
+            [attr.stroke-dasharray]="565.48"
+            [attr.stroke-dashoffset]="565.48 - (565.48 * phaseProgress()) / 100"
+            fill="transparent" 
+            r="90" 
+            cx="110" 
+            cy="110"
+          />
+          <defs>
+            <linearGradient id="roseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ff758c" />
+              <stop offset="100%" stop-color="#ff7eb3" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        <!-- Centered Info -->
+        <div class="cycle-center-text">
+          <span class="day-label">Day</span>
+          <span class="day-number">{{ cycleDay() }}</span>
+          <span class="cycle-total">of {{ cycleLength() }} days</span>
+        </div>
+      </div>
+
+      <div class="cycle-quick-stats">
+        <div class="stat-box">
+          <span class="material-icons info">event</span>
+          <div class="stat-info">
+            <p class="stat-title">Next Period</p>
+            <p class="stat-val">{{ nextPeriodDate() ? (nextPeriodDate() | date:'mediumDate') : 'Calculating...' }}</p>
+          </div>
+        </div>
+
+        <div class="stat-box">
+          <span class="material-icons success">analytics</span>
+          <div class="stat-info">
+            <p class="stat-title">Regularity Score</p>
+            <p class="stat-val">{{ regularityScore() }}%</p>
+          </div>
+        </div>
+      </div>
+
+      @if (isLate()) {
+        <div class="alert alert-warning select-alert">
+          <span class="material-icons">warning</span>
+          <p>Your period appears to be late. Log dates to update forecasts.</p>
+        </div>
+      }
+    </div>
+
+    <!-- Health Analytics Overview -->
+    <div class="glass-panel stats-card">
+      <h3>Cycle Insights</h3>
+      <div class="insights-grid">
+        <div class="insight-item">
+          <span class="material-icons">info</span>
+          <p class="insight-label">Regularity Status</p>
+          <p class="insight-value">{{ isIrregular() ? 'Irregular' : 'Highly Regular' }}</p>
+        </div>
+        <div class="insight-item">
+          <span class="material-icons">spa</span>
+          <p class="insight-label">Fertility Phase</p>
+          <p class="insight-value">{{ cyclePhase() === 'Ovulatory Phase' ? 'Fertile Window' : 'Safe Days' }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Tasks & Hydration -->
+  <div class="column-right">
+    
+    <!-- Water Tracker Card -->
+    <div class="glass-panel water-card">
+      <div class="water-header">
+        <div class="title-area">
+          <span class="material-icons water-icon">local_drink</span>
+          <h3>Water Tracker</h3>
+        </div>
+        <span class="water-progress-text">{{ waterCompletedLiters() }} / {{ waterGoalLiters() }} L</span>
+      </div>
+
+      <div class="water-liquid-container">
+        <!-- SVG wave effect -->
+        <div class="water-fill" [style.height.%]="waterPercentage()">
+          <div class="wave"></div>
+        </div>
+        <div class="percentage-display">{{ waterPercentage() }}%</div>
+      </div>
+
+      <div class="water-controls">
+        <button class="btn btn-outline btn-sm" (click)="addWater(250)">
+          <span class="material-icons">add</span> 250 ml
+        </button>
+        <button class="btn btn-outline btn-sm" (click)="addWater(500)">
+          <span class="material-icons">add</span> 500 ml
+        </button>
+        <button class="btn btn-outline btn-sm" (click)="addWater(750)">
+          <span class="material-icons">add</span> 750 ml
+        </button>
+      </div>
+    </div>
+
+    <!-- Medicine Reminders Checklist -->
+    <div class="glass-panel medicine-card">
+      <div class="card-header-simple">
+        <h3>Medications Today</h3>
+        <span class="badge badge-secondary">{{ medicineReminders().length }} reminders</span>
+      </div>
+
+      <div class="meds-list">
+        @if (medicineReminders().length === 0) {
+          <div class="empty-state">
+            <span class="material-icons">alarm_off</span>
+            <p>No medication reminders for today</p>
+            <a routerLink="/dashboard/reminders" class="btn btn-text">Set Reminder</a>
+          </div>
+        } @else {
+          @for (med of medicineReminders(); track med.id) {
+            <div class="med-item" [class.completed]="med.completed">
+              <div class="checkbox-group" (click)="toggleReminder(med)">
+                <input 
+                  type="checkbox" 
+                  [checked]="med.completed" 
+                  [id]="'med-' + med.id"
+                  readonly
+                />
+                <div class="med-info">
+                  <p class="med-name">{{ med.medicineName }}</p>
+                  <p class="med-dose">{{ med.dosage }} • {{ med.time }}</p>
+                </div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Quick Symptom & Mood Logger -->
+    <div class="glass-panel symptom-quick-card">
+      <div class="card-header-simple">
+        <h3>How are you feeling today?</h3>
+      </div>
+
+      <div class="mood-selectors">
+        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'HAPPY'" (click)="changeMood('HAPPY')" title="Happy">
+          <span class="emoji">😊</span>
+        </button>
+        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'CALM'" (click)="changeMood('CALM')" title="Calm">
+          <span class="emoji">😌</span>
+        </button>
+        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'TIRED'" (click)="changeMood('TIRED')" title="Tired">
+          <span class="emoji">😴</span>
+        </button>
+        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'IRRITABLE'" (click)="changeMood('IRRITABLE')" title="Irritable">
+          <span class="emoji">😠</span>
+        </button>
+        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'SAD'" (click)="changeMood('SAD')" title="Sad">
+          <span class="emoji">😢</span>
+        </button>
+      </div>
+
+      <div class="quick-symptoms">
+        <button 
+          class="symptom-pill" 
+          [class.active]="todaySymptoms().cramps" 
+          (click)="toggleQuickSymptom('cramps')"
+        >
+          Cramps
+        </button>
+        <button 
+          class="symptom-pill" 
+          [class.active]="todaySymptoms().headache" 
+          (click)="toggleQuickSymptom('headache')"
+        >
+          Headache
+        </button>
+        <button 
+          class="symptom-pill" 
+          [class.active]="todaySymptoms().bloating" 
+          (click)="toggleQuickSymptom('bloating')"
+        >
+          Bloating
+        </button>
+        <button 
+          class="symptom-pill" 
+          [class.active]="todaySymptoms().fatigue" 
+          (click)="toggleQuickSymptom('fatigue')"
+        >
+          Fatigue
+        </button>
+      </div>
+      
+      <div class="card-footer-simple">
+        <a routerLink="/dashboard/symptoms" class="btn btn-text btn-block">Log detailed symptoms &raquo;</a>
+      </div>
+    </div>
+
+  </div>
+</div>

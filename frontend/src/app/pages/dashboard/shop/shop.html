@@ -1,0 +1,654 @@
+<div class="shop-container">
+  
+  <!-- Navigation Sub-header & Mode Switcher Bar -->
+  <div class="shop-nav-header glass-panel">
+    <div class="header-left">
+      <div class="tabs">
+        <button class="tab-btn" [class.active]="currentTab() === 'CATALOG'" (click)="currentTab.set('CATALOG')">
+          <span class="material-icons">storefront</span>
+          <span>Organic Store</span>
+        </button>
+        <button class="tab-btn" [class.active]="currentTab() === 'WISHLIST'" (click)="currentTab.set('WISHLIST')">
+          <span class="material-icons">favorite</span>
+          <span>My Wishlist</span>
+        </button>
+        <button class="tab-btn" [class.active]="currentTab() === 'ORDERS'" (click)="currentTab.set('ORDERS')">
+          <span class="material-icons">receipt_long</span>
+          <span>My Orders</span>
+        </button>
+        @if (isAdminMode()) {
+          <button class="tab-btn admin-tab" [class.active]="currentTab() === 'ADMIN_ORDERS'" (click)="currentTab.set('ADMIN_ORDERS')">
+            <span class="material-icons">admin_panel_settings</span>
+            <span>All Store Orders (Admin)</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Admin / User Demo Account Switcher -->
+      <div class="role-badge-box" [class.admin]="isAdminMode()">
+        <span class="material-icons role-icon">{{ isAdminMode() ? 'verified_user' : 'person' }}</span>
+        <span class="role-title">{{ isAdminMode() ? 'Admin Verified' : 'User Account' }}</span>
+        <button class="btn-role-switch" (click)="toggleAdminMode()" title="Admin Authentication">
+          {{ isAdminMode() ? 'Log Out Admin' : 'Login as Admin 🔒' }}
+        </button>
+      </div>
+
+      <!-- Floating Cart Trigger Button -->
+      <button class="cart-floating-btn" (click)="toggleCart(true)" title="View Cart">
+        <span class="material-icons">shopping_cart</span>
+        @if (cart().cartItems.length > 0) {
+          <span class="cart-badge">{{ cart().cartItems.length }}</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- 1. CATALOG TAB -->
+  @if (currentTab() === 'CATALOG') {
+    <!-- Filters and Search Bar + Admin Add Product Button -->
+    <div class="catalog-filters glass-panel">
+      <div class="filters-top-row">
+        <div class="search-box">
+          <span class="material-icons">search</span>
+          <input 
+            type="text" 
+            placeholder="Search organic products by name, category, or brand..."
+            [(ngModel)]="searchInput"
+            (keyup)="search()"
+          />
+          @if (searchInput()) {
+            <button class="clear-search" (click)="clearSearch()">
+              <span class="material-icons">close</span>
+            </button>
+          }
+        </div>
+
+        <button class="btn btn-admin-add" (click)="openAddProductModal()">
+          <span class="material-icons">{{ isAdminMode() ? 'add_circle' : 'lock' }}</span>
+          <span>{{ isAdminMode() ? 'Add New Product' : 'Add Product (Admin Credentials)' }}</span>
+        </button>
+      </div>
+
+      <div class="categories-row">
+        <button class="cat-pill" [class.active]="selectedCategory() === ''" (click)="setCategory('')">All</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'MENSTRUAL'" (click)="setCategory('MENSTRUAL')">Menstrual Care</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'WELLNESS'" (click)="setCategory('WELLNESS')">Wellness</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'SUPPLEMENTS'" (click)="setCategory('SUPPLEMENTS')">Supplements</button>
+        <button class="cat-pill" [class.active]="selectedCategory() === 'SKINCARE'" (click)="setCategory('SKINCARE')">Skincare</button>
+      </div>
+    </div>
+
+    <!-- Product Grid -->
+    <div class="products-grid">
+      @if (products().length === 0) {
+        <div class="empty-products glass-panel">
+          <span class="material-icons">sentiment_dissatisfied</span>
+          <p>No products found matching filters.</p>
+        </div>
+      } @else {
+        @for (prod of products(); track prod.id) {
+          <div class="product-card glass-panel glass-panel-hover">
+            <div class="product-badge-row">
+              @if (prod.discount && prod.discount > 0) {
+                <span class="badge badge-danger">-{{ prod.discount | number:'1.0-0' }}%</span>
+              } @else {
+                <span></span>
+              }
+
+              <div class="card-top-actions">
+                @if (isAdminMode()) {
+                  <button class="icon-action-btn edit" (click)="openEditProductModal(prod, $event)" title="Edit Product (Admin)">
+                    <span class="material-icons">edit</span>
+                  </button>
+                  <button class="icon-action-btn delete" (click)="deleteProduct(prod.id, $event)" title="Delete Product (Admin)">
+                    <span class="material-icons">delete</span>
+                  </button>
+                }
+                <button class="wishlist-toggle" (click)="toggleWishlist(prod, $event)" [class.active]="isWishlistedMap()[prod.id]" title="Save to Wishlist">
+                  <span class="material-icons">{{ isWishlistedMap()[prod.id] ? 'favorite' : 'favorite_border' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="product-image-box" (click)="viewProduct(prod)">
+              <img [src]="prod.imageUrl || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400'" [alt]="prod.name" />
+            </div>
+
+            <div class="product-details" (click)="viewProduct(prod)">
+              <div class="meta-row">
+                <span class="prod-category">{{ prod.category }}</span>
+                <span class="stock-tag" [class.out]="prod.stock === 0">
+                  {{ prod.stock === 0 ? 'Out of stock' : ('In Stock: ' + prod.stock) }}
+                </span>
+              </div>
+              <h4 class="prod-name">{{ prod.name }}</h4>
+              
+              <div class="rating-row">
+                <span class="material-icons star">star</span>
+                <span class="rating-val">{{ prod.rating || 4.8 }}</span>
+                <span class="reviews-count">({{ prod.reviewsCount || 42 }} reviews)</span>
+              </div>
+
+              <div class="price-row">
+                <div class="price-block">
+                  <p class="price-val">₹{{ prod.price }}</p>
+                </div>
+
+                <button 
+                  class="btn btn-primary add-to-cart-btn" 
+                  (click)="addToCart(prod.id); $event.stopPropagation();"
+                  [disabled]="prod.stock === 0"
+                  title="Add to Cart"
+                >
+                  <span class="material-icons">add_shopping_cart</span>
+                  <span>Add</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- 2. WISHLIST TAB -->
+  @if (currentTab() === 'WISHLIST') {
+    <div class="wishlist-section glass-panel">
+      <h3>My Bookmarked Wishlist</h3>
+      <div class="wishlist-list">
+        @if (getWishlistProducts().length === 0) {
+          <div class="empty-state">
+            <span class="material-icons">favorite_border</span>
+            <p>Your wishlist is empty. Explore the catalog and tap the heart icon to save products!</p>
+          </div>
+        } @else {
+          @for (prod of getWishlistProducts(); track prod.id) {
+            <div class="wishlist-item glass-panel">
+              <img [src]="prod.imageUrl" [alt]="prod.name" class="wish-img" />
+              <div class="item-info">
+                <span class="cat-tag">{{ prod.category }}</span>
+                <h4>{{ prod.name }}</h4>
+                <p class="price">₹{{ prod.price }}</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-primary btn-sm" (click)="addToCart(prod.id)">
+                  <span class="material-icons">shopping_cart</span> Add to Cart
+                </button>
+                <button class="action-icon-btn delete" (click)="toggleWishlist(prod)">
+                  <span class="material-icons">delete</span>
+                </button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <!-- 3. USER ORDERS TAB -->
+  @if (currentTab() === 'ORDERS') {
+    <div class="orders-section glass-panel">
+      <h3>My Order History</h3>
+      <div class="orders-list">
+        @if (orderHistory().length === 0) {
+          <div class="empty-state">
+            <span class="material-icons">receipt</span>
+            <p>No order history found. Place an order from the Organic Store!</p>
+          </div>
+        } @else {
+          @for (ord of orderHistory(); track ord.id) {
+            <div class="order-card-panel glass-panel">
+              <div class="order-header-row">
+                <div class="order-id-block">
+                  <p class="order-num">{{ ord.orderNumber || ('Order #' + ord.id) }}</p>
+                  <p class="order-date">Placed: {{ ord.orderDate | date:'medium' }}</p>
+                </div>
+                <div class="status-tags">
+                  <span class="badge" 
+                    [class.badge-success]="ord.orderStatus === 'DELIVERED'"
+                    [class.badge-warning]="ord.orderStatus === 'SHIPPED' || ord.orderStatus === 'PENDING'"
+                    [class.badge-danger]="ord.orderStatus === 'CANCELLED'"
+                  >
+                    {{ ord.orderStatus }}
+                  </span>
+                  <span class="badge badge-secondary">{{ ord.paymentMethod }}</span>
+                </div>
+              </div>
+
+              <!-- Order items summary -->
+              @if (ord.orderItems && ord.orderItems.length > 0) {
+                <div class="order-items-preview">
+                  @for (item of ord.orderItems; track item.id) {
+                    <div class="item-summary-line">
+                      <span>• {{ item.productName }} (x{{ item.quantity }})</span>
+                      <span>₹{{ item.subtotal }}</span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <div class="order-summary-row">
+                <p class="order-price">Total Amount: <span>₹{{ ord.totalAmount }}</span></p>
+                @if (ord.orderStatus === 'PENDING') {
+                  <button class="btn btn-outline btn-sm danger-btn" (click)="cancelOrder(ord.id)">
+                    Cancel Order
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <!-- 4. ADMIN ALL ORDERS TAB -->
+  @if (currentTab() === 'ADMIN_ORDERS') {
+    <div class="orders-section glass-panel">
+      <h3>All Store Orders (Admin View)</h3>
+      <div class="orders-list">
+        @if (orderHistory().length === 0) {
+          <div class="empty-state">
+            <span class="material-icons">inventory_2</span>
+            <p>No customer orders placed yet.</p>
+          </div>
+        } @else {
+          @for (ord of orderHistory(); track ord.id) {
+            <div class="order-card-panel glass-panel">
+              <div class="order-header-row">
+                <div class="order-id-block">
+                  <p class="order-num">{{ ord.orderNumber || ('Order #' + ord.id) }}</p>
+                  <p class="order-date">Customer Address: {{ ord.address?.fullName || 'Customer' }} ({{ ord.address?.city }})</p>
+                </div>
+                <div class="status-tags">
+                  <span class="badge" 
+                    [class.badge-success]="ord.orderStatus === 'DELIVERED'"
+                    [class.badge-warning]="ord.orderStatus === 'SHIPPED' || ord.orderStatus === 'PENDING'"
+                    [class.badge-danger]="ord.orderStatus === 'CANCELLED'"
+                  >
+                    Status: {{ ord.orderStatus }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Order items summary -->
+              @if (ord.orderItems && ord.orderItems.length > 0) {
+                <div class="order-items-preview">
+                  @for (item of ord.orderItems; track item.id) {
+                    <div class="item-summary-line">
+                      <span>• {{ item.productName }} (Qty: {{ item.quantity }})</span>
+                      <span>₹{{ item.subtotal }}</span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <div class="order-summary-row admin-status-actions">
+                <p class="order-price">Total: <span>₹{{ ord.totalAmount }}</span></p>
+                <div class="admin-buttons">
+                  <button class="btn btn-outline btn-sm" (click)="updateOrderStatusByAdmin(ord.id, 'PENDING')">Mark Pending</button>
+                  <button class="btn btn-outline btn-sm" (click)="updateOrderStatusByAdmin(ord.id, 'SHIPPED')">Mark Shipped</button>
+                  <button class="btn btn-primary btn-sm" (click)="updateOrderStatusByAdmin(ord.id, 'DELIVERED')">Mark Delivered</button>
+                </div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ADMIN CREDENTIALS LOGIN MODAL -->
+  @if (isAdminLoginModalOpen()) {
+    <div class="modal-overlay" (click)="closeAdminLoginModal()">
+      <div class="admin-login-card glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="header-title-box">
+            <span class="material-icons lock-icon">admin_panel_settings</span>
+            <h3>Admin Portal Authentication</h3>
+          </div>
+          <button class="close-btn" (click)="closeAdminLoginModal()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body admin-login-body">
+          <p class="subtitle">Please enter your Store Admin credentials to add or manage products and store orders.</p>
+
+          @if (adminLoginError()) {
+            <div class="alert-box danger-alert">
+              <span class="material-icons">error_outline</span>
+              <span>{{ adminLoginError() }}</span>
+            </div>
+          }
+
+          <div class="input-group">
+            <label>Admin Email Address *</label>
+            <div class="input-with-icon">
+              <span class="material-icons">email</span>
+              <input type="email" [(ngModel)]="adminEmail" placeholder="Enter admin email address" (keyup.enter)="verifyAdminCredentials()" />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Admin Password *</label>
+            <div class="input-with-icon">
+              <span class="material-icons">lock</span>
+              <input type="password" [(ngModel)]="adminPassword" placeholder="Enter admin password" (keyup.enter)="verifyAdminCredentials()" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeAdminLoginModal()">Cancel</button>
+          <button class="btn btn-primary btn-admin-submit" (click)="verifyAdminCredentials()">
+            <span class="material-icons">verified_user</span>
+            <span>Authenticate Admin</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ADMIN ADD / EDIT PRODUCT MODAL -->
+  @if (isAddProductModalOpen()) {
+    <div class="modal-overlay" (click)="closeAddProductModal()">
+      <div class="admin-product-modal glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ editingProductId() ? 'Edit Organic Product (Admin)' : 'Add New Organic Product (Admin)' }}</h3>
+          <button class="close-btn" (click)="closeAddProductModal()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body form-grid">
+          <div class="input-group">
+            <label>Product Name *</label>
+            <input type="text" [(ngModel)]="prodName" placeholder="e.g. Organic Cotton Sanitary Pads" />
+          </div>
+
+          <div class="grid-2">
+            <div class="input-group">
+              <label>Category *</label>
+              <select [(ngModel)]="prodCategory">
+                <option value="MENSTRUAL">Menstrual Care</option>
+                <option value="WELLNESS">Wellness</option>
+                <option value="SUPPLEMENTS">Supplements</option>
+                <option value="SKINCARE">Skincare</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Brand</label>
+              <input type="text" [(ngModel)]="prodBrand" placeholder="HerCycle Organics" />
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="input-group">
+              <label>Price (₹) *</label>
+              <input type="number" step="0.01" [(ngModel)]="prodPrice" />
+            </div>
+            <div class="input-group">
+              <label>Discount (%)</label>
+              <input type="number" [(ngModel)]="prodDiscount" />
+            </div>
+            <div class="input-group">
+              <label>Stock Qty *</label>
+              <input type="number" [(ngModel)]="prodStock" />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Product Image URL *</label>
+            <input type="text" [(ngModel)]="prodImageUrl" placeholder="https://..." />
+            <div class="preset-row">
+              <span class="preset-label">Quick Select Image Preset:</span>
+              <div class="preset-thumbnails">
+                @for (preset of imagePresets; track preset) {
+                  <img [src]="preset" (click)="selectPresetImage(preset)" [class.selected]="prodImageUrl === preset" alt="Preset" />
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Product Description *</label>
+            <textarea rows="3" [(ngModel)]="prodDescription" placeholder="Detailed product features, organic ingredients, and benefits..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeAddProductModal()">Cancel</button>
+          <button class="btn btn-primary" (click)="saveProduct()">
+            <span class="material-icons">save</span>
+            <span>{{ editingProductId() ? 'Save Changes' : 'Publish Product' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- CART SIDE DRAWER -->
+  @if (isCartOpen()) {
+    <div class="drawer-overlay" (click)="toggleCart(false)">
+      <div class="cart-drawer glass-panel" (click)="$event.stopPropagation()">
+        <div class="drawer-header">
+          <h3>Shopping Cart</h3>
+          <button class="close-btn" (click)="toggleCart(false)">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="drawer-body">
+          @if (cart().cartItems.length === 0) {
+            <div class="empty-cart">
+              <span class="material-icons">shopping_cart_off</span>
+              <p>Your shopping cart is empty</p>
+            </div>
+          } @else {
+            <div class="cart-items-list">
+              @for (item of cart().cartItems; track item.id) {
+                <div class="cart-item-row">
+                  <div class="item-left">
+                    <img [src]="item.productImage || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400'" class="cart-thumb" alt="" />
+                    <div class="item-meta">
+                      <h5>{{ item.productName }}</h5>
+                      <p class="price">₹{{ item.price }}</p>
+                    </div>
+                  </div>
+
+                  <div class="item-right">
+                    <div class="quantity-controller">
+                      <button class="qty-btn" (click)="updateQuantity(item, -1)">-</button>
+                      <span class="qty-val">{{ item.quantity }}</span>
+                      <button class="qty-btn" (click)="updateQuantity(item, 1)">+</button>
+                    </div>
+                    <button class="item-delete" (click)="removeCartItem(item.id)">
+                      <span class="material-icons">delete</span>
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="cart-calculations">
+              <div class="calc-row"><span>Subtotal:</span><span>₹{{ cart().totalAmount }}</span></div>
+              <div class="coupon-box">
+                <input type="text" placeholder="Coupon Code (e.g. ORGANIC10)" [(ngModel)]="couponCode" />
+              </div>
+              <div class="calc-row total"><span>Total Amount:</span><span>₹{{ cart().totalAmount }}</span></div>
+            </div>
+          }
+        </div>
+
+        @if (cart().cartItems.length > 0) {
+          <div class="drawer-footer">
+            <button class="btn btn-outline" (click)="clearCart()">Clear Cart</button>
+            <button class="btn btn-primary" (click)="openCheckout()">Proceed to Checkout</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- CHECKOUT MODAL -->
+  @if (isCheckoutOpen()) {
+    <div class="modal-overlay" (click)="closeCheckout()">
+      <div class="checkout-card glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Delivery Checkout</h3>
+          <button class="close-btn" (click)="closeCheckout()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        @if (checkoutSuccessOrder()) {
+          <div class="success-screen">
+            <span class="material-icons success-icon">check_circle</span>
+            <h3>Order Placed Successfully!</h3>
+            <p class="order-num">Order Number: <strong>{{ checkoutSuccessOrder()?.orderNumber }}</strong></p>
+            <p>Your order total of <strong>₹{{ checkoutSuccessOrder()?.totalAmount }}</strong> has been confirmed. Track status under My Orders.</p>
+            <button class="btn btn-primary" (click)="dismissOrderSuccess()">View My Orders</button>
+          </div>
+        } @else {
+          <div class="modal-body checkout-body">
+            
+            <!-- Address list -->
+            <div class="checkout-section">
+              <div class="section-title-row">
+                <h4>Shipping Address</h4>
+                <button class="btn btn-text btn-sm" (click)="isNewAddressFormOpen.set(true)">+ Add New Address</button>
+              </div>
+
+              @if (isNewAddressFormOpen()) {
+                <div class="new-address-form glass-panel">
+                  <div class="input-group">
+                    <label>Full Name *</label>
+                    <input type="text" [(ngModel)]="addressFullName" placeholder="Jenny Doe" />
+                  </div>
+                  <div class="input-group">
+                    <label>Phone Number *</label>
+                    <input type="tel" [(ngModel)]="addressPhone" placeholder="+1 555-0199" />
+                  </div>
+                  <div class="grid-layout">
+                    <div class="input-group">
+                      <label>House/Flat No *</label>
+                      <input type="text" [(ngModel)]="addressHouseNo" placeholder="Apt 4B" />
+                    </div>
+                    <div class="input-group">
+                      <label>Street *</label>
+                      <input type="text" [(ngModel)]="addressStreet" placeholder="123 Wellness Ave" />
+                    </div>
+                  </div>
+                  <div class="grid-layout">
+                    <div class="input-group">
+                      <label>City *</label>
+                      <input type="text" [(ngModel)]="addressCity" placeholder="San Francisco" />
+                    </div>
+                    <div class="input-group">
+                      <label>Pin Code *</label>
+                      <input type="text" [(ngModel)]="addressPinCode" placeholder="94107" />
+                    </div>
+                  </div>
+                  <div class="button-row">
+                    <button class="btn btn-outline" (click)="isNewAddressFormOpen.set(false)">Cancel</button>
+                    <button class="btn btn-primary" (click)="saveAddress()">Save Address</button>
+                  </div>
+                </div>
+              } @else {
+                <div class="addresses-list">
+                  @if (addresses().length === 0) {
+                    <div class="empty-address">
+                      <p>No addresses saved. Please add a shipping address to proceed.</p>
+                    </div>
+                  } @else {
+                    @for (addr of addresses(); track addr.id) {
+                      <div class="address-item-card" [class.selected]="selectedAddressId() === addr.id" (click)="selectedAddressId.set(addr.id || null)">
+                        <input type="radio" name="checkoutAddress" [checked]="selectedAddressId() === addr.id" />
+                        <div class="address-details">
+                          <p class="name">{{ addr.fullName }} • {{ addr.phone }}</p>
+                          <p class="details">{{ addr.houseNo }}, {{ addr.street }}, {{ addr.city }} - {{ addr.pinCode }}</p>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Payment -->
+            <div class="checkout-section">
+              <h4>Payment Option</h4>
+              <div class="payment-box">
+                <span class="material-icons">local_shipping</span>
+                <div>
+                  <p class="method">Cash On Delivery (COD)</p>
+                  <p class="desc">Pay with cash when items arrive at your door.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Order Review -->
+            <div class="checkout-section border-top">
+              <div class="review-totals">
+                <div class="calc-row"><span>Total Amount:</span><span class="price">₹{{ cart().totalAmount }}</span></div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-outline" (click)="closeCheckout()">Cancel</button>
+            <button class="btn btn-primary" (click)="submitOrder()" [disabled]="addresses().length === 0">Place Order</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- PRODUCT DETAIL POPUP -->
+  @if (isDetailOpen() && selectedProduct()) {
+    <div class="modal-overlay" (click)="closeProductDetail()">
+      <div class="product-detail-modal glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Product Overview</h3>
+          <button class="close-btn" (click)="closeProductDetail()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        
+        <div class="modal-body product-detail-body">
+          <div class="detail-left">
+            <img [src]="selectedProduct()?.imageUrl || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400'" [alt]="selectedProduct()?.name" />
+          </div>
+          <div class="detail-right">
+            <span class="category">{{ selectedProduct()?.category }}</span>
+            <h2>{{ selectedProduct()?.name }}</h2>
+            <p class="brand">Brand: {{ selectedProduct()?.brand || 'HerCycle Organics' }}</p>
+            <div class="rating-row">
+              <span class="material-icons star">star</span>
+              <span>{{ selectedProduct()?.rating || 4.8 }}</span>
+            </div>
+            <p class="description">{{ selectedProduct()?.description }}</p>
+            <p class="stock-status" [class.out]="selectedProduct()?.stock === 0">
+              {{ selectedProduct()?.stock === 0 ? 'Out of stock' : ('In Stock: ' + selectedProduct()?.stock + ' units') }}
+            </p>
+            <div class="checkout-action-row">
+              <span class="price-tag">₹{{ selectedProduct()?.price }}</span>
+              <button 
+                class="btn btn-primary" 
+                (click)="addToCart(selectedProduct()!.id); closeProductDetail();"
+                [disabled]="selectedProduct()?.stock === 0"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

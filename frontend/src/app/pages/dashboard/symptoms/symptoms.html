@@ -1,0 +1,267 @@
+<div class="symptoms-layout">
+  
+  <!-- Left Side: Log Editor -->
+  <div class="symptoms-editor glass-panel">
+    <div class="editor-header">
+      <div class="title-with-date">
+        <h3>Log Health Metrics</h3>
+        <input 
+          type="date" 
+          [ngModel]="selectedDate()"
+          (ngModelChange)="onDateChange($event)"
+          class="date-picker-inline"
+        />
+      </div>
+    </div>
+
+    @if (successMessage()) {
+      <div class="alert alert-success">
+        <span class="material-icons">check_circle_outline</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    @if (errorMessage()) {
+      <div class="alert alert-danger">
+        <span class="material-icons">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <div class="editor-body">
+      <!-- Mood Selection -->
+      <div class="section-group">
+        <label class="section-label">Daily Mood</label>
+        <div class="mood-grid">
+          <button class="mood-card" [class.active]="mood() === 'HAPPY'" (click)="mood.set('HAPPY')">
+            <span class="emoji">😊</span>
+            <span class="mood-text">Happy</span>
+          </button>
+          <button class="mood-card" [class.active]="mood() === 'CALM'" (click)="mood.set('CALM')">
+            <span class="emoji">😌</span>
+            <span class="mood-text">Calm</span>
+          </button>
+          <button class="mood-card" [class.active]="mood() === 'TIRED'" (click)="mood.set('TIRED')">
+            <span class="emoji">😴</span>
+            <span class="mood-text">Tired</span>
+          </button>
+          <button class="mood-card" [class.active]="mood() === 'ANXIOUS'" (click)="mood.set('ANXIOUS')">
+            <span class="emoji">😰</span>
+            <span class="mood-text">Anxious</span>
+          </button>
+          <button class="mood-card" [class.active]="mood() === 'SAD'" (click)="mood.set('SAD')">
+            <span class="emoji">😢</span>
+            <span class="mood-text">Sad</span>
+          </button>
+          <button class="mood-card" [class.active]="mood() === 'IRRITABLE'" (click)="mood.set('IRRITABLE')">
+            <span class="emoji">😠</span>
+            <span class="mood-text">Irritable</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sliders for Pain and Energy -->
+      <div class="sliders-grid">
+        <div class="slider-box">
+          <div class="slider-header">
+            <label>Pain Severity</label>
+            <span class="slider-val">{{ pain() }} / 10</span>
+          </div>
+          <input 
+            type="range" 
+            min="0" 
+            max="10" 
+            [ngModel]="pain()"
+            (ngModelChange)="pain.set($event)"
+            class="range-slider primary-slider"
+          />
+          <div class="slider-labels">
+            <span>None</span>
+            <span>Unbearable</span>
+          </div>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-header">
+            <label>Energy Level</label>
+            <span class="slider-val">{{ energy() }} / 10</span>
+          </div>
+          <input 
+            type="range" 
+            min="0" 
+            max="10" 
+            [ngModel]="energy()"
+            (ngModelChange)="energy.set($event)"
+            class="range-slider secondary-slider"
+          />
+          <div class="slider-labels">
+            <span>Exhausted</span>
+            <span>Vibrant</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Physical Symptoms -->
+      <div class="section-group">
+        <label class="section-label">Physical Symptoms</label>
+        <div class="checkbox-buttons-grid">
+          <button class="checkbox-pill" [class.active]="cramps()" (click)="cramps.set(!cramps())">
+            <span class="material-icons">flash_on</span>
+            <span>Cramps</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="headache()" (click)="headache.set(!headache())">
+            <span class="material-icons">psychology</span>
+            <span>Headache</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="backPain()" (click)="backPain.set(!backPain())">
+            <span class="material-icons">accessibility</span>
+            <span>Back Pain</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="bloating()" (click)="bloating.set(!bloating())">
+            <span class="material-icons">donut_large</span>
+            <span>Bloating</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="acne()" (click)="acne.set(!acne())">
+            <span class="material-icons">face</span>
+            <span>Acne</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="fatigue()" (click)="fatigue.set(!fatigue())">
+            <span class="material-icons">battery_alert</span>
+            <span>Fatigue</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="nausea()" (click)="nausea.set(!nausea())">
+            <span class="material-icons">sick</span>
+            <span>Nausea</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="cravings()" (click)="cravings.set(!cravings())">
+            <span class="material-icons">restaurant</span>
+            <span>Cravings</span>
+          </button>
+          <button class="checkbox-pill" [class.active]="breastPain()" (click)="breastPain.set(!breastPain())">
+            <span class="material-icons">favorite_border</span>
+            <span>Breast Tenderness</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Vital parameters -->
+      <div class="grid-3">
+        <div class="input-group">
+          <label for="sleep">Sleep Hours</label>
+          <input 
+            type="number" 
+            id="sleep" 
+            placeholder="8" 
+            [ngModel]="sleep()"
+            (ngModelChange)="sleep.set($event)"
+            min="0"
+          />
+        </div>
+        <div class="input-group">
+          <label for="temp">Basal Temp (&deg;C)</label>
+          <input 
+            type="number" 
+            id="temp" 
+            placeholder="36.5" 
+            [ngModel]="temperature()"
+            (ngModelChange)="temperature.set($event)"
+            step="0.1"
+          />
+        </div>
+        <div class="input-group">
+          <label for="weight">Weight (kg)</label>
+          <input 
+            type="number" 
+            id="weight" 
+            placeholder="60" 
+            [ngModel]="weight()"
+            (ngModelChange)="weight.set($event)"
+            step="0.1"
+          />
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="input-group">
+        <label for="notes">Notes & Daily Logs</label>
+        <textarea 
+          id="notes" 
+          rows="3" 
+          placeholder="How did you sleep? Any particular self care notes?"
+          [ngModel]="notes()"
+          (ngModelChange)="notes.set($event)"
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="editor-footer">
+      <button class="btn btn-outline" (click)="resetFormKeepDate()">Reset Form</button>
+      <button class="btn btn-primary" (click)="saveLog()" [disabled]="isSaving()">
+        @if (isSaving()) {
+          <span class="spinner"></span>
+          <span>Saving...</span>
+        } @else {
+          <span class="material-icons">save</span>
+          <span>Save Entry</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Right Side: Log History Timeline -->
+  <div class="symptoms-history glass-panel">
+    <h3>Symptom Logs History</h3>
+    
+    <div class="history-timeline">
+      @if (history().length === 0) {
+        <div class="empty-timeline">
+          <span class="material-icons">assignment</span>
+          <p>No logged health metrics found. Save an entry to start tracking.</p>
+        </div>
+      } @else {
+        @for (item of history(); track item.id) {
+          <div class="timeline-card glass-panel" (click)="selectHistoryLog(item)">
+            <div class="timeline-date-row">
+              <span class="log-date">{{ item.date | date:'mediumDate' }}</span>
+              <button class="delete-log-btn" (click)="deleteLog(item.id); $event.stopPropagation();" title="Delete Log">
+                <span class="material-icons">delete</span>
+              </button>
+            </div>
+            
+            <div class="timeline-details">
+              <div class="timeline-mood">
+                <span class="mood-tag">
+                  @if (item.mood === 'HAPPY') { 😊 Happy }
+                  @else if (item.mood === 'CALM') { 😌 Calm }
+                  @else if (item.mood === 'TIRED') { 😴 Tired }
+                  @else if (item.mood === 'ANXIOUS') { 😰 Anxious }
+                  @else if (item.mood === 'SAD') { 😢 Sad }
+                  @else if (item.mood === 'IRRITABLE') { 😠 Irritable }
+                  @else { {{ item.mood }} }
+                </span>
+                <span class="badge badge-danger">Pain: {{ item.pain }}/10</span>
+                <span class="badge badge-success">Sleep: {{ item.sleep }}h</span>
+              </div>
+              
+              <div class="timeline-tags">
+                @if (item.cramps) { <span class="tag">Cramps</span> }
+                @if (item.headache) { <span class="tag">Headache</span> }
+                @if (item.bloating) { <span class="tag">Bloating</span> }
+                @if (item.fatigue) { <span class="tag">Fatigue</span> }
+                @if (item.acne) { <span class="tag">Acne</span> }
+                @if (item.nausea) { <span class="tag">Nausea</span> }
+                @if (item.cravings) { <span class="tag">Cravings</span> }
+                @if (item.backPain) { <span class="tag">Back Pain</span> }
+              </div>
+
+              @if (item.notes) {
+                <p class="timeline-notes">"{{ item.notes }}"</p>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+</div>

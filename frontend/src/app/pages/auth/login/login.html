@@ -1,0 +1,81 @@
+<div class="auth-container">
+  <div class="auth-card glass-panel">
+    <div class="auth-header">
+      <div class="logo">
+        <img src="assets/logo.jpeg" alt="HerCycle Logo" class="logo-img" />
+        <h1>HerCycle</h1>
+      </div>
+      <p class="subtitle">Empowering Women's Health & Wellness</p>
+    </div>
+
+    @if (errorMessage()) {
+      <div class="alert alert-danger">
+        <span class="material-icons">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <form (submit)="onSubmit(); $event.preventDefault();" class="auth-form">
+      <div class="input-group">
+        <label for="email">Email Address</label>
+        <div class="input-wrapper">
+          <span class="material-icons input-icon">email</span>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            placeholder="name@example.com"
+            [ngModel]="email()"
+            (ngModelChange)="email.set($event)"
+            required
+            autocomplete="email"
+          />
+        </div>
+      </div>
+
+      <div class="input-group">
+        <div class="label-row">
+          <label for="password">Password</label>
+          <a routerLink="/forgot-password" class="forgot-link">Forgot?</a>
+        </div>
+        <div class="input-wrapper">
+          <span class="material-icons input-icon">lock</span>
+          <input 
+            [type]="showPassword() ? 'text' : 'password'" 
+            id="password" 
+            name="password" 
+            placeholder="Enter your password"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            required
+            autocomplete="current-password"
+          />
+          <button 
+            type="button" 
+            class="password-toggle" 
+            (click)="togglePasswordVisibility()"
+            title="Toggle password visibility"
+          >
+            <span class="material-icons">
+              {{ showPassword() ? 'visibility_off' : 'visibility' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" [disabled]="isLoading()">
+        @if (isLoading()) {
+          <span class="spinner"></span>
+          <span>Signing In...</span>
+        } @else {
+          <span>Sign In</span>
+          <span class="material-icons">arrow_forward</span>
+        }
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p>Don't have an account? <a routerLink="/register" class="signup-link">Sign Up</a></p>
+    </div>
+  </div>
+</div>
