@@ -11,12 +11,13 @@ import { RemindersPage } from './pages/dashboard/reminders/reminders';
 import { ShopPage } from './pages/dashboard/shop/shop';
 import { SelfCarePage } from './pages/dashboard/self-care/self-care';
 import { PartnerPage } from './pages/dashboard/partner/partner';
+import { PartnerModePage } from './pages/dashboard/partner-mode/partner-mode';
+import { PartnerAcceptPage } from './pages/partner-accept/partner-accept';
+import { AnalysisPage } from './pages/dashboard/analysis/analysis';
 import { FeedbackPage } from './pages/dashboard/feedback/feedback';
 import { ProfilePage } from './pages/dashboard/profile/profile';
-import { AdminPage } from './pages/dashboard/admin/admin';
 import { LandingPage } from './pages/landing/landing';
 import { authGuard } from './guards/auth.guard';
-import { adminGuard } from './guards/admin.guard';
 
 export const routes: Routes = [
   { path: '', component: LandingPage },
@@ -25,6 +26,7 @@ export const routes: Routes = [
   { path: 'register', component: RegisterPage },
   { path: 'forgot-password', component: ForgotPasswordPage },
   { path: 'reset-password', component: ResetPasswordPage },
+  { path: 'partner/accept', component: PartnerAcceptPage },
   {
     path: 'dashboard',
     component: DashboardLayout,
@@ -32,14 +34,15 @@ export const routes: Routes = [
     children: [
       { path: 'home', component: HomePage },
       { path: 'calendar', component: CalendarPage },
+      { path: 'analysis', component: AnalysisPage },
       { path: 'symptoms', component: SymptomsPage },
       { path: 'reminders', component: RemindersPage },
       { path: 'shop', component: ShopPage },
       { path: 'self-care', component: SelfCarePage },
       { path: 'partner', component: PartnerPage },
+      { path: 'partner-mode', component: PartnerModePage },
       { path: 'feedback', component: FeedbackPage },
       { path: 'profile', component: ProfilePage },
-      { path: 'admin', component: AdminPage, canActivate: [adminGuard] },
       { path: '', redirectTo: 'home', pathMatch: 'full' }
     ]
   },

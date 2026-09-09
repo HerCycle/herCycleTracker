@@ -35,17 +35,13 @@ export class LoginPage {
     this.errorMessage.set(null);
 
     this.auth.login({
-      email: this.email(),
+      email: this.email().trim(),
       password: this.password()
     }).subscribe({
       next: (res) => {
         this.isLoading.set(false);
         if (res.success) {
-          if (this.auth.isAdmin()) {
-            this.router.navigate(['/dashboard/admin']);
-          } else {
-            this.router.navigate(['/dashboard/home']);
-          }
+          this.router.navigate(['/dashboard/home']);
         } else {
           this.errorMessage.set(res.message || 'Login failed. Please check credentials.');
         }
@@ -53,6 +49,26 @@ export class LoginPage {
       error: (err) => {
         this.isLoading.set(false);
         this.errorMessage.set(err.message || 'Incorrect email or password.');
+      }
+    });
+  }
+
+  onGoogleSignIn(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    this.auth.loginWithGoogle().subscribe({
+      next: (res) => {
+        this.isLoading.set(false);
+        if (res.success) {
+          this.router.navigate(['/dashboard/home']);
+        } else {
+          this.errorMessage.set(res.message || 'Google sign-in failed.');
+        }
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(err?.message || 'Google sign-in failed.');
       }
     });
   }

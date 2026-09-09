@@ -1,50 +1,8 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SymptomService, SymptomLog } from '../../../services/symptom.service';
-
-const DEFAULT_SYMPTOM_LOGS: SymptomLog[] = [
-  {
-    id: 1,
-    date: new Date().toISOString().split('T')[0],
-    mood: 'CALM',
-    pain: 5,
-    energy: 7,
-    sleep: 7.5,
-    waterIntake: 2.0,
-    temperature: 36.6,
-    weight: 58.5,
-    cramps: true,
-    headache: false,
-    backPain: true,
-    bloating: false,
-    acne: false,
-    fatigue: true,
-    nausea: false,
-    cravings: false,
-    breastPain: false,
-    notes: 'Feeling calm today, mild lower back tightness. Herbal tea helped.'
-  },
-  {
-    id: 2,
-    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    mood: 'TIRED',
-    pain: 6,
-    energy: 4,
-    sleep: 6.0,
-    waterIntake: 1.5,
-    cramps: true,
-    headache: true,
-    backPain: false,
-    bloating: true,
-    acne: true,
-    fatigue: true,
-    nausea: false,
-    cravings: true,
-    breastPain: false,
-    notes: 'Day 1 of cycle. Resting with heating patch.'
-  }
-];
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-symptoms',
@@ -53,14 +11,20 @@ const DEFAULT_SYMPTOM_LOGS: SymptomLog[] = [
   templateUrl: './symptoms.html',
   styleUrl: './symptoms.scss'
 })
-export class SymptomsPage implements OnInit {
+export class SymptomsPage implements OnInit, OnDestroy {
   private readonly symptomService = inject(SymptomService);
+  private sub?: Subscription;
 
   readonly history = signal<SymptomLog[]>([]);
   readonly selectedDate = signal(new Date().toISOString().split('T')[0]);
+  readonly isLoading = signal(true);
+
+  readonly successMessage = signal<string | null>(null);
+  readonly errorMessage = signal<string | null>(null);
+  readonly isSaving = signal(false);
 
   // Form Fields State
-  readonly logId = signal<number | null>(null);
+  readonly logId = signal<string | null>(null);
   readonly mood = signal('CALM');
   readonly pain = signal(5);
   readonly energy = signal(7);
@@ -68,102 +32,86 @@ export class SymptomsPage implements OnInit {
   readonly waterIntake = signal(2.0);
   readonly temperature = signal<number | null>(36.6);
   readonly weight = signal<number | null>(58.5);
-  readonly notes = signal('');
 
   // Checkboxes
-  readonly cramps = signal(true);
+  readonly cramps = signal(false);
   readonly headache = signal(false);
-  readonly backPain = signal(true);
+  readonly backPain = signal(false);
   readonly bloating = signal(false);
   readonly acne = signal(false);
-  readonly fatigue = signal(true);
+  readonly fatigue = signal(false);
   readonly nausea = signal(false);
   readonly cravings = signal(false);
   readonly breastPain = signal(false);
 
-  readonly successMessage = signal<string | null>(null);
-  readonly errorMessage = signal<string | null>(null);
-  readonly isSaving = signal(false);
+  readonly notes = signal('');
 
   ngOnInit(): void {
-    this.loadHistory();
-    this.loadDateLog();
-  }
-
-  loadHistory(): void {
-    const saved = localStorage.getItem('hc_symptom_history');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          this.history.set(parsed);
-        } else {
-          this.history.set(DEFAULT_SYMPTOM_LOGS);
-          this.saveLocalHistory(DEFAULT_SYMPTOM_LOGS);
-        }
-      } catch (e) {
-        this.history.set(DEFAULT_SYMPTOM_LOGS);
-      }
-    } else {
-      this.history.set(DEFAULT_SYMPTOM_LOGS);
-      this.saveLocalHistory(DEFAULT_SYMPTOM_LOGS);
-    }
-
-    // Try backend load
-    this.symptomService.getSymptomHistory().subscribe({
-      next: (res) => {
-        if (res.success && res.data && res.data.length > 0) {
-          this.history.set(res.data);
-          this.saveLocalHistory(res.data);
-        }
-      }
-    });
-  }
-
-  saveLocalHistory(list: SymptomLog[]): void {
-    localStorage.setItem('hc_symptom_history', JSON.stringify(list));
-  }
-
-  loadDateLog(): void {
-    const dateStr = this.selectedDate();
-    const existing = this.history().find(h => h.date === dateStr);
-
-    if (existing) {
-      this.selectHistoryLog(existing);
-      return;
-    }
-
-    // Try backend
-    this.symptomService.getSymptomLog(dateStr).subscribe({
-      next: (res) => {
-        if (res.success && res.data) {
-          this.selectHistoryLog(res.data);
-        } else {
-          this.resetFormKeepDate();
-        }
+    this.sub = this.symptomService.getSymptomHistory().subscribe({
+      next: (logs) => {
+        this.isLoading.set(false);
+        this.history.set(logs || []);
+        this.loadLogForSelectedDate(this.selectedDate());
       },
       error: () => {
-        this.resetFormKeepDate();
+        this.isLoading.set(false);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
   }
 
   onDateChange(newDate: string): void {
     this.selectedDate.set(newDate);
-    this.loadDateLog();
+    this.loadLogForSelectedDate(newDate);
+  }
+
+  loadLogForSelectedDate(dateStr: string): void {
+    const existing = this.history().find(l => l.date === dateStr);
+    if (existing) {
+      this.populateFormFromEntry(existing);
+    } else {
+      this.resetFormKeepDate();
+    }
+  }
+
+  selectHistoryLog(item: SymptomLog): void {
+    this.selectedDate.set(item.date);
+    this.populateFormFromEntry(item);
+  }
+
+  private populateFormFromEntry(existing: SymptomLog): void {
+    this.logId.set(existing.id || null);
+    this.mood.set(existing.mood || 'CALM');
+    this.pain.set(existing.pain ?? 5);
+    this.energy.set(existing.energy ?? 7);
+    this.sleep.set(existing.sleep ?? 7.5);
+    this.waterIntake.set(existing.waterIntake ?? 2.0);
+    this.temperature.set(existing.temperature ?? 36.6);
+    this.weight.set(existing.weight ?? 58.5);
+    this.cramps.set(!!existing.cramps);
+    this.headache.set(!!existing.headache);
+    this.backPain.set(!!existing.backPain);
+    this.bloating.set(!!existing.bloating);
+    this.acne.set(!!existing.acne);
+    this.fatigue.set(!!existing.fatigue);
+    this.nausea.set(!!existing.nausea);
+    this.cravings.set(!!existing.cravings);
+    this.breastPain.set(!!existing.breastPain);
+    this.notes.set(existing.notes || '');
   }
 
   resetFormKeepDate(): void {
     this.logId.set(null);
-    this.mood.set('HAPPY');
-    this.pain.set(0);
+    this.mood.set('CALM');
+    this.pain.set(3);
     this.energy.set(7);
-    this.sleep.set(7);
-    this.waterIntake.set(0.0);
-    this.temperature.set(null);
+    this.sleep.set(7.5);
+    this.waterIntake.set(2.0);
+    this.temperature.set(36.6);
     this.weight.set(null);
-    this.notes.set('');
-
     this.cramps.set(false);
     this.headache.set(false);
     this.backPain.set(false);
@@ -173,14 +121,17 @@ export class SymptomsPage implements OnInit {
     this.nausea.set(false);
     this.cravings.set(false);
     this.breastPain.set(false);
+    this.notes.set('');
+    this.errorMessage.set(null);
+    this.successMessage.set(null);
   }
 
   saveLog(): void {
     this.isSaving.set(true);
     this.errorMessage.set(null);
+    this.successMessage.set(null);
 
     const payload: SymptomLog = {
-      id: this.logId() || Date.now(),
       date: this.selectedDate(),
       mood: this.mood(),
       pain: this.pain(),
@@ -189,7 +140,6 @@ export class SymptomsPage implements OnInit {
       waterIntake: this.waterIntake(),
       temperature: this.temperature() || undefined,
       weight: this.weight() || undefined,
-      notes: this.notes() || undefined,
       cramps: this.cramps(),
       headache: this.headache(),
       backPain: this.backPain(),
@@ -198,72 +148,45 @@ export class SymptomsPage implements OnInit {
       fatigue: this.fatigue(),
       nausea: this.nausea(),
       cravings: this.cravings(),
-      breastPain: this.breastPain()
+      breastPain: this.breastPain(),
+      notes: this.notes().trim() || undefined
     };
 
-    const currentHistory = this.history();
-    const existingIndex = currentHistory.findIndex(h => h.date === payload.date || (payload.id && h.id === payload.id));
-
-    let updatedHistory: SymptomLog[];
-    if (existingIndex >= 0) {
-      updatedHistory = [...currentHistory];
-      updatedHistory[existingIndex] = payload;
-    } else {
-      updatedHistory = [payload, ...currentHistory];
-    }
-
-    this.history.set(updatedHistory);
-    this.saveLocalHistory(updatedHistory);
-    this.logId.set(payload.id || null);
-    this.isSaving.set(false);
-
-    this.successMessage.set(`Symptom log for ${payload.date} saved successfully!`);
-    setTimeout(() => this.successMessage.set(null), 3500);
-
-    // Sync backend
-    const id = this.logId();
-    const req = id 
-      ? this.symptomService.updateSymptoms(id, payload)
+    const currentId = this.logId();
+    const action$ = currentId
+      ? this.symptomService.updateSymptoms(currentId, payload)
       : this.symptomService.saveSymptoms(payload);
 
-    req.subscribe();
+    action$.subscribe({
+      next: (res) => {
+        this.isSaving.set(false);
+        if (res.success) {
+          this.successMessage.set('Health metrics saved to Firestore successfully!');
+          setTimeout(() => this.successMessage.set(null), 4000);
+        } else {
+          this.errorMessage.set(res.message || 'Failed to save health metrics.');
+        }
+      },
+      error: () => {
+        this.isSaving.set(false);
+        this.errorMessage.set('An error occurred while saving health metrics.');
+      }
+    });
   }
 
-  deleteLog(id?: number): void {
+  deleteLog(id?: string): void {
     if (!id || !confirm('Are you sure you want to delete this symptom log?')) return;
 
-    const updated = this.history().filter(h => h.id !== id);
-    this.history.set(updated);
-    this.saveLocalHistory(updated);
-
-    if (id === this.logId()) {
-      this.resetFormKeepDate();
-    }
-
-    this.symptomService.deleteSymptoms(id).subscribe();
-  }
-
-  selectHistoryLog(log: SymptomLog): void {
-    this.selectedDate.set(log.date);
-    this.logId.set(log.id || null);
-    this.mood.set(log.mood || 'HAPPY');
-    this.pain.set(log.pain || 0);
-    this.energy.set(log.energy || 7);
-    this.sleep.set(log.sleep || 7);
-    this.waterIntake.set(log.waterIntake || 0.0);
-    this.temperature.set(log.temperature || null);
-    this.weight.set(log.weight || null);
-    this.notes.set(log.notes || '');
-
-    this.cramps.set(log.cramps || false);
-    this.headache.set(log.headache || false);
-    this.backPain.set(log.backPain || false);
-    this.bloating.set(log.bloating || false);
-    this.acne.set(log.acne || false);
-    this.fatigue.set(log.fatigue || false);
-    this.nausea.set(log.nausea || false);
-    this.cravings.set(log.cravings || false);
-    this.breastPain.set(log.breastPain || false);
+    this.symptomService.deleteSymptoms(id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.successMessage.set('Symptom entry deleted from Firestore.');
+          this.resetFormKeepDate();
+          setTimeout(() => this.successMessage.set(null), 3000);
+        } else {
+          alert(res.message || 'Failed to delete symptom log.');
+        }
+      }
+    });
   }
 }
-

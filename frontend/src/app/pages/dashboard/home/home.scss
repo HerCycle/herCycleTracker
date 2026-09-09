@@ -26,6 +26,57 @@
   }
 }
 
+/* Setup Prompt Card */
+.setup-prompt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(255, 100, 128, 0.08) 0%, rgba(123, 44, 191, 0.08) 100%);
+  border: 1.5px solid rgba(255, 100, 128, 0.25);
+  border-radius: 16px;
+
+  .setup-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255, 100, 128, 0.15);
+    flex-shrink: 0;
+
+    .setup-icon {
+      color: var(--primary-color);
+      font-size: 1.5rem;
+    }
+  }
+
+  .setup-content {
+    flex: 1;
+
+    h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.35rem;
+    }
+
+    p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      margin-bottom: 0.85rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+}
+
 /* Cycle Ring styles */
 .cycle-card {
   padding: 2rem;

@@ -3,11 +3,27 @@
   <!-- Left Side: Cycle Ring & Health Stats -->
   <div class="column-left">
     
+    @if (!isLoadingCycle() && !hasCycleData()) {
+      <div class="glass-panel setup-prompt-card">
+        <div class="setup-icon-wrap">
+          <span class="material-icons setup-icon">calendar_month</span>
+        </div>
+        <div class="setup-content">
+          <h4>Set Up Your Cycle Tracking</h4>
+          <p>No period history found yet. Enter your actual period start date and cycle length to activate live cycle phases, ovulation forecasting, and fertility window calculations.</p>
+          <a routerLink="/dashboard/calendar" class="btn btn-primary btn-sm">
+            <span class="material-icons">add_circle</span>
+            <span>Enter Period Information</span>
+          </a>
+        </div>
+      </div>
+    }
+
     <!-- Cycle Phase Card -->
     <div class="glass-panel cycle-card">
       <div class="card-header-simple">
         <h3>Current Cycle Status</h3>
-        <span class="badge badge-primary">{{ cyclePhase() }}</span>
+        <span class="badge badge-primary">{{ isLoadingCycle() ? 'Syncing...' : cyclePhase() }}</span>
       </div>
 
       <div class="cycle-ring-container">
@@ -28,7 +44,7 @@
             stroke-width="14" 
             stroke-linecap="round"
             [attr.stroke-dasharray]="565.48"
-            [attr.stroke-dashoffset]="565.48 - (565.48 * phaseProgress()) / 100"
+            [attr.stroke-dashoffset]="hasCycleData() ? (565.48 - (565.48 * phaseProgress()) / 100) : 565.48"
             fill="transparent" 
             r="90" 
             cx="110" 
@@ -44,9 +60,21 @@
 
         <!-- Centered Info -->
         <div class="cycle-center-text">
-          <span class="day-label">Day</span>
-          <span class="day-number">{{ cycleDay() }}</span>
-          <span class="cycle-total">of {{ cycleLength() }} days</span>
+          @if (isLoadingCycle()) {
+            <span class="day-label">Cycle Status</span>
+            <span class="day-number" style="font-size: 1.25rem; line-height: 1.2;">Loading...</span>
+            <span class="cycle-total">Syncing data</span>
+          } @else if (hasCycleData()) {
+            <span class="day-label">Day</span>
+            <span class="day-number">{{ cycleDay() }}</span>
+            <span class="cycle-total">of {{ cycleLength() }} days</span>
+          } @else {
+            <span class="day-label">Start Cycle</span>
+            <span class="day-number" style="font-size: 1.5rem; line-height: 1.2;">No Logs</span>
+            <a routerLink="/dashboard/calendar" class="cycle-total" style="text-decoration: underline; color: var(--primary-pink); cursor: pointer;">
+              Log Period &raquo;
+            </a>
+          }
         </div>
       </div>
 
@@ -55,7 +83,7 @@
           <span class="material-icons info">event</span>
           <div class="stat-info">
             <p class="stat-title">Next Period</p>
-            <p class="stat-val">{{ nextPeriodDate() ? (nextPeriodDate() | date:'mediumDate') : 'Calculating...' }}</p>
+            <p class="stat-val">{{ isLoadingCycle() ? 'Syncing...' : (nextPeriodDate() ? (nextPeriodDate() | date:'mediumDate') : 'Log period to view') }}</p>
           </div>
         </div>
 
@@ -63,7 +91,7 @@
           <span class="material-icons success">analytics</span>
           <div class="stat-info">
             <p class="stat-title">Regularity Score</p>
-            <p class="stat-val">{{ regularityScore() }}%</p>
+            <p class="stat-val">{{ isLoadingCycle() ? 'Syncing...' : (hasCycleData() && hasCompletedCycles() ? (regularityScore() + '%') : 'Building history') }}</p>
           </div>
         </div>
       </div>
@@ -81,14 +109,30 @@
       <h3>Cycle Insights</h3>
       <div class="insights-grid">
         <div class="insight-item">
-          <span class="material-icons">info</span>
+          <span class="material-icons">analytics</span>
           <p class="insight-label">Regularity Status</p>
-          <p class="insight-value">{{ isIrregular() ? 'Irregular' : 'Highly Regular' }}</p>
+          <p class="insight-value">{{ hasCycleData() ? (hasCompletedCycles() ? (isIrregular() ? 'Irregular' : (regularityStatus() === 'REGULAR' ? 'Highly Regular' : 'Slight Variation')) : 'Building history') : 'Awaiting logs' }}</p>
         </div>
         <div class="insight-item">
           <span class="material-icons">spa</span>
           <p class="insight-label">Fertility Phase</p>
-          <p class="insight-value">{{ cyclePhase() === 'Ovulatory Phase' ? 'Fertile Window' : 'Safe Days' }}</p>
+          <p class="insight-value">{{ fertilityPhase() }}</p>
+        </div>
+        <div class="insight-item">
+          <span class="material-icons">egg_alt</span>
+          <p class="insight-label">Estimated Ovulation</p>
+          <p class="insight-value">{{ hasCycleData() && ovulationDate() ? (ovulationDate() | date:'mediumDate') : 'Awaiting logs' }}</p>
+        </div>
+        <div class="insight-item">
+          <span class="material-icons">favorite</span>
+          <p class="insight-label">Fertile Window</p>
+          <p class="insight-value">
+            @if (hasCycleData() && fertileWindowStart() && fertileWindowEnd()) {
+              {{ fertileWindowStart() | date:'MMM d' }} - {{ fertileWindowEnd() | date:'MMM d' }}
+            } @else {
+              Awaiting logs
+            }
+          </p>
         </div>
       </div>
     </div>
@@ -170,19 +214,19 @@
       </div>
 
       <div class="mood-selectors">
-        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'HAPPY'" (click)="changeMood('HAPPY')" title="Happy">
+        <button class="mood-btn" [class.selected]="todaySymptomLog().mood === 'HAPPY'" (click)="changeMood('HAPPY')" title="Happy">
           <span class="emoji">😊</span>
         </button>
-        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'CALM'" (click)="changeMood('CALM')" title="Calm">
+        <button class="mood-btn" [class.selected]="todaySymptomLog().mood === 'CALM'" (click)="changeMood('CALM')" title="Calm">
           <span class="emoji">😌</span>
         </button>
-        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'TIRED'" (click)="changeMood('TIRED')" title="Tired">
+        <button class="mood-btn" [class.selected]="todaySymptomLog().mood === 'TIRED'" (click)="changeMood('TIRED')" title="Tired">
           <span class="emoji">😴</span>
         </button>
-        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'IRRITABLE'" (click)="changeMood('IRRITABLE')" title="Irritable">
+        <button class="mood-btn" [class.selected]="todaySymptomLog().mood === 'IRRITABLE'" (click)="changeMood('IRRITABLE')" title="Irritable">
           <span class="emoji">😠</span>
         </button>
-        <button class="mood-btn" [class.selected]="todaySymptoms().mood === 'SAD'" (click)="changeMood('SAD')" title="Sad">
+        <button class="mood-btn" [class.selected]="todaySymptomLog().mood === 'SAD'" (click)="changeMood('SAD')" title="Sad">
           <span class="emoji">😢</span>
         </button>
       </div>
@@ -190,28 +234,28 @@
       <div class="quick-symptoms">
         <button 
           class="symptom-pill" 
-          [class.active]="todaySymptoms().cramps" 
+          [class.active]="todaySymptomLog().cramps" 
           (click)="toggleQuickSymptom('cramps')"
         >
           Cramps
         </button>
         <button 
           class="symptom-pill" 
-          [class.active]="todaySymptoms().headache" 
+          [class.active]="todaySymptomLog().headache" 
           (click)="toggleQuickSymptom('headache')"
         >
           Headache
         </button>
         <button 
           class="symptom-pill" 
-          [class.active]="todaySymptoms().bloating" 
+          [class.active]="todaySymptomLog().bloating" 
           (click)="toggleQuickSymptom('bloating')"
         >
           Bloating
         </button>
         <button 
           class="symptom-pill" 
-          [class.active]="todaySymptoms().fatigue" 
+          [class.active]="todaySymptomLog().fatigue" 
           (click)="toggleQuickSymptom('fatigue')"
         >
           Fatigue

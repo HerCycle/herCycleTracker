@@ -1,37 +1,34 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CycleService, PeriodLog } from '../../../services/cycle.service';
+import { CycleService, PeriodLog, DateCycleInfo, CycleDayStatus, FertilityLevel } from '../../../services/cycle.service';
+import { PartnerService } from '../../../services/partner.service';
+import { Subscription } from 'rxjs';
 
 export interface CalendarDay {
   date: Date;
   dateStr: string;
   dayNum: number;
   isCurrentMonth: boolean;
+  status: CycleDayStatus;
+  cycleDayNum: number | null;
+  phase: string;
+  fertilityLevel: FertilityLevel;
+  titleTooltip: string;
+  ariaLabel: string;
+  logId?: string;
   isPeriod: boolean;
   isPredicted: boolean;
   isOvulation: boolean;
   isFertile: boolean;
-  isSafe: boolean;
-  logId?: number;
+  isLowerFertility: boolean;
 }
 
-const DEFAULT_PERIOD_LOGS: PeriodLog[] = [
-  {
-    id: 1,
-    periodStartDate: '2026-08-01',
-    periodEndDate: '2026-08-05',
-    flow: 'HEAVY',
-    notes: 'Normal flow with light cramps on day 1 & 2.'
-  },
-  {
-    id: 2,
-    periodStartDate: '2026-07-04',
-    periodEndDate: '2026-07-08',
-    flow: 'MEDIUM',
-    notes: 'Regular 28-day cycle rhythm.'
-  }
-];
+export interface PeriodLogWithHistory extends PeriodLog {
+  isCurrentCycle: boolean;
+  actualCycleDays: number | null;
+  cycleLengthDisplay: string;
+}
 
 @Component({
   selector: 'app-calendar',
@@ -40,8 +37,10 @@ const DEFAULT_PERIOD_LOGS: PeriodLog[] = [
   templateUrl: './calendar.html',
   styleUrl: './calendar.scss'
 })
-export class CalendarPage implements OnInit {
+export class CalendarPage implements OnInit, OnDestroy {
   private readonly cycleService = inject(CycleService);
+  private readonly partnerService = inject(PartnerService);
+  private periodSub?: Subscription;
 
   readonly currentYear = signal(new Date().getFullYear());
   readonly currentMonth = signal(new Date().getMonth()); // 0-indexed
@@ -51,21 +50,80 @@ export class CalendarPage implements OnInit {
   ];
   readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Calendar cells & period logs
+  // Calendar cells & period logs from Firestore
   readonly calendarDays = signal<CalendarDay[]>([]);
   readonly periodLogs = signal<PeriodLog[]>([]);
+  readonly isLoading = signal(true);
 
-  // Computed Predictions
+  // Selected date state for interactive inspection
+  readonly selectedDate = signal<string>(this.formatDateString(new Date()));
+  readonly selectedDateInfo = signal<DateCycleInfo | null>(null);
+
+  // Predictions calculated from real Firestore logs
   readonly ovulationDates = signal<string[]>([]);
   readonly fertileDates = signal<string[]>([]);
-  readonly safeDates = signal<string[]>([]);
+  readonly lowerFertilityDates = signal<string[]>([]);
   readonly nextPeriodDate = signal<string | null>(null);
 
   // Cycle Statistics
   readonly avgCycleLength = signal<number>(28);
   readonly avgPeriodLength = signal<number>(5);
+  readonly hasCompletedCycles = signal<boolean>(false);
+  readonly regularityStatusText = signal<string>('Building history');
 
-  // Logging period form state
+  // History list with actual cycle lengths derived from consecutive logs
+  readonly periodLogsWithHistory = computed<PeriodLogWithHistory[]>(() => {
+    const logs = this.periodLogs();
+    if (!logs || logs.length === 0) return [];
+
+    const sortedAsc = [...logs]
+      .filter((l) => !!l.periodStartDate)
+      .sort(
+        (a, b) =>
+          this.parseLocalDate(a.periodStartDate).getTime() -
+          this.parseLocalDate(b.periodStartDate).getTime()
+      );
+
+    const resultAsc: PeriodLogWithHistory[] = sortedAsc.map((log, idx) => {
+      const isLatest = idx === sortedAsc.length - 1;
+      if (isLatest) {
+        return {
+          ...log,
+          isCurrentCycle: true,
+          actualCycleDays: null,
+          cycleLengthDisplay: 'Current cycle'
+        };
+      }
+
+      const nextLog = sortedAsc[idx + 1];
+      const dCurrent = this.parseLocalDate(log.periodStartDate).getTime();
+      const dNext = this.parseLocalDate(nextLog.periodStartDate).getTime();
+      const diffDays = Math.round((dNext - dCurrent) / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 15 && diffDays <= 60) {
+        return {
+          ...log,
+          isCurrentCycle: false,
+          actualCycleDays: diffDays,
+          cycleLengthDisplay: `Cycle length: ${diffDays} days`
+        };
+      }
+
+      return {
+        ...log,
+        isCurrentCycle: false,
+        actualCycleDays: null,
+        cycleLengthDisplay: 'Cycle length: Not available yet'
+      };
+    });
+
+    return resultAsc.reverse();
+  });
+
+  // Today Date String
+  readonly todayDateStr = this.formatDateString(new Date());
+
+  // Modal State
   readonly isLogModalOpen = signal(false);
   readonly selectedLog = signal<PeriodLog | null>(null);
   readonly startDate = signal('');
@@ -82,15 +140,41 @@ export class CalendarPage implements OnInit {
     const nextStr = this.nextPeriodDate();
     if (!nextStr) return null;
     const today = new Date();
-    today.setHours(0,0,0,0);
-    const target = new Date(nextStr);
-    target.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
+    const target = this.parseLocalDate(nextStr);
     const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return diff;
   });
 
+  parseLocalDate(dateStr: string): Date {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0);
+    }
+    const d = new Date(dateStr);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
   ngOnInit(): void {
-    this.loadAllData();
+    this.periodSub = this.cycleService.getPeriodLogs().subscribe({
+      next: (logs) => {
+        this.isLoading.set(false);
+        this.periodLogs.set(logs || []);
+        this.calculateCyclePredictions();
+        this.generateCalendar();
+        this.updateSelectedDateInfo();
+      },
+      error: () => {
+        this.isLoading.set(false);
+        this.generateCalendar();
+        this.updateSelectedDateInfo();
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.periodSub?.unsubscribe();
   }
 
   showToast(msg: string): void {
@@ -102,116 +186,71 @@ export class CalendarPage implements OnInit {
     }, 3500);
   }
 
-  loadAllData(): void {
-    const savedLogs = localStorage.getItem('hc_period_logs');
-    if (savedLogs) {
-      try {
-        const parsed = JSON.parse(savedLogs);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          this.periodLogs.set(parsed);
-        } else {
-          this.periodLogs.set(DEFAULT_PERIOD_LOGS);
-          this.saveLocalLogs(DEFAULT_PERIOD_LOGS);
-        }
-      } catch (e) {
-        this.periodLogs.set(DEFAULT_PERIOD_LOGS);
-      }
-    } else {
-      this.periodLogs.set(DEFAULT_PERIOD_LOGS);
-      this.saveLocalLogs(DEFAULT_PERIOD_LOGS);
-    }
-
-    this.calculateCyclePredictions();
-    this.generateCalendar();
-
-    // Try backend sync
-    this.cycleService.getHistory().subscribe({
-      next: (res) => {
-        if (res.success && res.data && res.data.length > 0) {
-          this.periodLogs.set(res.data);
-          this.saveLocalLogs(res.data);
-          this.calculateCyclePredictions();
-          this.generateCalendar();
-        }
-      }
-    });
-  }
-
-  saveLocalLogs(logs: PeriodLog[]): void {
-    localStorage.setItem('hc_period_logs', JSON.stringify(logs));
+  updateSelectedDateInfo(): void {
+    const selStr = this.selectedDate() || this.todayDateStr;
+    const info = this.cycleService.getDateCycleStatus(
+      selStr,
+      this.periodLogs(),
+      this.avgCycleLength()
+    );
+    this.selectedDateInfo.set(info);
   }
 
   calculateCyclePredictions(): void {
-    const logs = [...this.periodLogs()].sort((a, b) => 
-      new Date(b.periodStartDate).getTime() - new Date(a.periodStartDate).getTime()
-    );
+    const logs = this.periodLogs();
+    if (logs.length === 0) {
+      this.nextPeriodDate.set(null);
+      this.ovulationDates.set([]);
+      this.fertileDates.set([]);
+      this.lowerFertilityDates.set([]);
+      this.hasCompletedCycles.set(false);
+      this.regularityStatusText.set('Building history');
+      return;
+    }
 
-    if (logs.length === 0) return;
+    const metrics = this.cycleService.calculateCycleMetrics(logs);
+    if (!metrics.hasData) return;
 
-    // Calculate average cycle length if multiple logs
-    if (logs.length >= 2) {
-      let totalDiff = 0;
-      for (let i = 0; i < logs.length - 1; i++) {
-        const d1 = new Date(logs[i].periodStartDate).getTime();
-        const d2 = new Date(logs[i+1].periodStartDate).getTime();
-        totalDiff += Math.abs(d1 - d2) / (1000 * 60 * 60 * 24);
+    this.avgCycleLength.set(metrics.cycleLength);
+    this.avgPeriodLength.set(metrics.periodLength);
+    this.nextPeriodDate.set(metrics.nextPeriodDate);
+    this.hasCompletedCycles.set(metrics.hasCompletedCycles);
+
+    if (metrics.hasCompletedCycles) {
+      if (metrics.regularityStatus === 'REGULAR') {
+        this.regularityStatusText.set('Regular Rhythm');
+      } else if (metrics.regularityStatus === 'SLIGHT_VARIATION') {
+        this.regularityStatusText.set('Slight Variation');
+      } else if (metrics.regularityStatus === 'IRREGULAR') {
+        this.regularityStatusText.set('Variable Rhythm');
+      } else {
+        this.regularityStatusText.set('Building history');
       }
-      const avg = Math.round(totalDiff / (logs.length - 1));
-      if (avg >= 21 && avg <= 45) {
-        this.avgCycleLength.set(avg);
+    } else {
+      this.regularityStatusText.set('Building history');
+    }
+
+    if (metrics.ovulationDate) {
+      this.ovulationDates.set([metrics.ovulationDate]);
+    }
+
+    // Compute fertile window days
+    if (metrics.ovulationDate) {
+      const fertile: string[] = [];
+      const ovDate = this.parseLocalDate(metrics.ovulationDate);
+      for (let i = -5; i <= 1; i++) {
+        const d = new Date(ovDate);
+        d.setDate(d.getDate() + i);
+        fertile.push(this.formatDateString(d));
       }
+      this.fertileDates.set(fertile);
     }
-
-    const latest = logs[0];
-    const latestStart = new Date(latest.periodStartDate);
-    const cycleLen = this.avgCycleLength();
-
-    // Next period prediction
-    const nextStart = new Date(latestStart);
-    nextStart.setDate(nextStart.getDate() + cycleLen);
-    const nextStartStr = this.formatDateString(nextStart);
-    this.nextPeriodDate.set(nextStartStr);
-
-    // Predicted period days (e.g. 5 days)
-    const predictedDays: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(nextStart);
-      d.setDate(d.getDate() + i);
-      predictedDays.push(this.formatDateString(d));
-    }
-
-    // Ovulation Day (14 days before next period)
-    const ovulation = new Date(nextStart);
-    ovulation.setDate(ovulation.getDate() - 14);
-    const ovulationStr = this.formatDateString(ovulation);
-    this.ovulationDates.set([ovulationStr]);
-
-    // Fertile Window (5 days before ovulation + 1 day after)
-    const fertile: string[] = [];
-    for (let i = -5; i <= 1; i++) {
-      const fd = new Date(ovulation);
-      fd.setDate(fd.getDate() + i);
-      fertile.push(this.formatDateString(fd));
-    }
-    this.fertileDates.set(fertile);
-
-    // Safe Days (non-period, non-fertile days)
-    const safe: string[] = [];
-    for (let i = 0; i < 60; i++) {
-      const sd = new Date(latestStart);
-      sd.setDate(sd.getDate() + i);
-      const sdStr = this.formatDateString(sd);
-      if (!fertile.includes(sdStr) && !predictedDays.includes(sdStr)) {
-        safe.push(sdStr);
-      }
-    }
-    this.safeDates.set(safe);
   }
 
   generateCalendar(): void {
     const year = this.currentYear();
     const month = this.currentMonth();
-    
+
     const firstDayIndex = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
     const prevMonthLastDate = new Date(year, month, 0).getDate();
@@ -230,7 +269,7 @@ export class CalendarPage implements OnInit {
       days.push(this.createCalendarDay(dayDate, true));
     }
 
-    // Next month filler days to complete 42 cells (6 rows of 7)
+    // Next month filler days to complete 42 cells
     const totalCells = 42;
     const nextDaysCount = totalCells - days.length;
     for (let i = 1; i <= nextDaysCount; i++) {
@@ -243,44 +282,49 @@ export class CalendarPage implements OnInit {
 
   createCalendarDay(date: Date, isCurrentMonth: boolean): CalendarDay {
     const dateStr = this.formatDateString(date);
-    
-    let isPeriod = false;
-    let logId: number | undefined;
+    const dayInfo = this.cycleService.getDateCycleStatus(
+      date,
+      this.periodLogs(),
+      this.avgCycleLength()
+    );
 
-    for (const log of this.periodLogs()) {
-      if (log.periodStartDate) {
-        const start = new Date(log.periodStartDate);
-        const end = log.periodEndDate ? new Date(log.periodEndDate) : new Date(log.periodStartDate);
-        
-        start.setHours(0,0,0,0);
-        end.setHours(0,0,0,0);
-        const checkDate = new Date(date);
-        checkDate.setHours(0,0,0,0);
+    const monthName = this.monthNames[date.getMonth()];
+    const dayNum = date.getDate();
+    const year = date.getFullYear();
 
-        if (checkDate >= start && checkDate <= end) {
-          isPeriod = true;
-          logId = log.id;
-          break;
-        }
-      }
+    let ariaStatusText = dayInfo.title;
+    if (dayInfo.status === 'LOGGED_PERIOD') {
+      ariaStatusText = `logged period, cycle day ${dayInfo.cycleDay || 1}`;
+    } else if (dayInfo.status === 'PREDICTED_PERIOD') {
+      ariaStatusText = 'predicted period';
+    } else if (dayInfo.status === 'OVULATION') {
+      ariaStatusText = `estimated ovulation${dayInfo.cycleDay ? ', cycle day ' + dayInfo.cycleDay : ''}`;
+    } else if (dayInfo.status === 'FERTILE') {
+      ariaStatusText = 'fertile window';
+    } else if (dayInfo.status === 'LOWER_FERTILITY') {
+      ariaStatusText = 'lower fertility';
     }
 
-    const isOvulation = this.ovulationDates().includes(dateStr);
-    const isFertile = this.fertileDates().includes(dateStr);
-    const isSafe = this.safeDates().includes(dateStr);
-    const isPredicted = this.nextPeriodDate() === dateStr;
+    const ariaLabel = `${monthName} ${dayNum}, ${year}, ${ariaStatusText}`;
+    const titleTooltip = `${monthName} ${dayNum}: ${dayInfo.title} (${dayInfo.phase})`;
 
     return {
       date,
       dateStr,
-      dayNum: date.getDate(),
+      dayNum,
       isCurrentMonth,
-      isPeriod,
-      isPredicted,
-      isOvulation,
-      isFertile,
-      isSafe,
-      logId
+      status: dayInfo.status,
+      cycleDayNum: dayInfo.cycleDay,
+      phase: dayInfo.phase,
+      fertilityLevel: dayInfo.fertilityLevel,
+      titleTooltip,
+      ariaLabel,
+      logId: dayInfo.logId,
+      isPeriod: dayInfo.status === 'LOGGED_PERIOD',
+      isPredicted: dayInfo.status === 'PREDICTED_PERIOD',
+      isOvulation: dayInfo.status === 'OVULATION',
+      isFertile: dayInfo.status === 'FERTILE',
+      isLowerFertility: dayInfo.status === 'LOWER_FERTILITY'
     };
   }
 
@@ -312,24 +356,22 @@ export class CalendarPage implements OnInit {
   }
 
   onDayCellClick(day: CalendarDay): void {
-    const existingLog = this.periodLogs().find(l => l.id === day.logId);
-    if (existingLog) {
-      this.openEditLogModal(existingLog);
-    } else {
-      this.selectedLog.set(null);
-      this.startDate.set(day.dateStr);
-      this.endDate.set('');
-      this.flow.set('MEDIUM');
-      this.notes.set('');
-      this.errorMessage.set(null);
-      this.isLogModalOpen.set(true);
-    }
+    this.selectedDate.set(day.dateStr);
+    const info = this.cycleService.getDateCycleStatus(
+      day.dateStr,
+      this.periodLogs(),
+      this.avgCycleLength()
+    );
+    this.selectedDateInfo.set(info);
   }
 
-  // --- Modal Operations ---
   openAddLogModal(): void {
+    this.openLogModalForDate(this.selectedDate() || this.formatDateString(new Date()));
+  }
+
+  openLogModalForDate(dateStr?: string): void {
     this.selectedLog.set(null);
-    this.startDate.set(this.formatDateString(new Date()));
+    this.startDate.set(dateStr || this.selectedDate() || this.formatDateString(new Date()));
     this.endDate.set('');
     this.flow.set('MEDIUM');
     this.cycleLength.set(this.avgCycleLength() || 28);
@@ -337,6 +379,26 @@ export class CalendarPage implements OnInit {
     this.notes.set('');
     this.errorMessage.set(null);
     this.isLogModalOpen.set(true);
+  }
+
+  openEditLogModalById(logId: string): void {
+    const existingLog = this.periodLogs().find(l => l.id === logId);
+    if (existingLog) {
+      this.openEditLogModal(existingLog);
+    }
+  }
+
+  getFertilityLabel(level?: FertilityLevel): string {
+    switch (level) {
+      case 'HIGH':
+        return 'Highest estimated fertility';
+      case 'ELEVATED':
+        return 'Higher fertility likelihood';
+      case 'LOWER':
+        return 'Lower estimated fertility likelihood';
+      default:
+        return 'Not enough cycle data';
+    }
   }
 
   openEditLogModal(log: PeriodLog): void {
@@ -355,76 +417,99 @@ export class CalendarPage implements OnInit {
     this.isLogModalOpen.set(false);
   }
 
-  setPresetCycleLength(days: number): void {
-    this.cycleLength.set(days);
-  }
-
   saveLog(): void {
-    if (!this.startDate()) {
-      this.errorMessage.set('Start date is required');
+    const startVal = this.startDate()?.trim();
+    if (!startVal) {
+      this.errorMessage.set('Start date is required.');
       return;
     }
 
-    const cycleLen = this.cycleLength() || 28;
-    const periodLen = this.periodLength() || 5;
+    const periodLen = Number(this.periodLength()) || 5;
+    const cycleLen = Number(this.cycleLength()) || this.avgCycleLength() || 28;
 
-    // Calculate auto end date if end date is not explicitly selected
-    let endStr = this.endDate();
-    if (!endStr && this.startDate()) {
-      const startD = new Date(this.startDate());
-      startD.setDate(startD.getDate() + periodLen - 1);
-      endStr = this.formatDateString(startD);
+    let endStr = this.endDate()?.trim();
+    if (!endStr) {
+      const parts = startVal.split('-').map(Number);
+      if (parts.length === 3) {
+        const calcEnd = new Date(parts[0], parts[1] - 1, parts[2]);
+        calcEnd.setDate(calcEnd.getDate() + periodLen - 1);
+        endStr = this.formatDateString(calcEnd);
+      }
     }
 
     const payload: PeriodLog = {
-      id: this.selectedLog()?.id || Date.now(),
-      periodStartDate: this.startDate(),
+      periodStartDate: startVal,
       periodEndDate: endStr || undefined,
       flow: this.flow(),
       cycleLength: cycleLen,
       periodLength: periodLen,
-      notes: this.notes() || undefined
+      notes: this.notes()?.trim() || undefined
     };
 
-    const currentLogs = this.periodLogs();
-    let updatedLogs: PeriodLog[];
+    const selected = this.selectedLog();
+    const isNew = !selected?.id;
 
-    if (this.selectedLog()) {
-      updatedLogs = currentLogs.map(l => l.id === payload.id ? payload : l);
-      this.showToast(`Updated period log (${cycleLen}-day cycle)`);
-    } else {
-      updatedLogs = [payload, ...currentLogs];
-      this.showToast(`Logged period (${cycleLen}-day cycle)`);
+    // Validate using CycleService validation rules
+    const validation = this.cycleService.validatePeriodLog(
+      payload,
+      this.periodLogs(),
+      selected?.id
+    );
+
+    if (!validation.valid) {
+      this.errorMessage.set(validation.error || 'Please correct the period log information.');
+      return;
     }
 
-    this.avgCycleLength.set(cycleLen);
-    this.avgPeriodLength.set(periodLen);
-    this.periodLogs.set(updatedLogs);
-    this.saveLocalLogs(updatedLogs);
-    this.calculateCyclePredictions();
-    this.generateCalendar();
-    this.closeLogModal();
+    this.isSaving.set(true);
+    this.errorMessage.set(null);
 
-    // Backend sync
-    const log = this.selectedLog();
-    const req = log?.id 
-      ? this.cycleService.updatePeriod(log.id, payload)
-      : this.cycleService.logPeriod(payload);
+    const action$ = isNew
+      ? this.cycleService.logPeriod(payload)
+      : this.cycleService.updatePeriod(selected.id!, payload);
 
-    req.subscribe();
+    action$.subscribe({
+      next: (res) => {
+        this.isSaving.set(false);
+        if (res.success) {
+          // Immediately sync shared partner data
+          this.partnerService.syncSharedData().catch((err) => console.warn('Partner sync error:', err));
+
+          if (isNew) {
+            this.showToast(
+              'Your actual period has been recorded. Future predictions will be updated using your cycle history.'
+            );
+          } else {
+            this.showToast('Period log updated in Firestore!');
+          }
+          this.closeLogModal();
+          this.updateSelectedDateInfo();
+        } else {
+          this.errorMessage.set(res.message || 'Failed to save period log.');
+        }
+      },
+      error: (err) => {
+        this.isSaving.set(false);
+        this.errorMessage.set(err.message || 'An error occurred while saving.');
+      }
+    });
   }
 
-  deleteLog(id?: number): void {
+  deleteLog(id?: string): void {
     if (!id || !confirm('Are you sure you want to delete this period log?')) return;
-    
-    const updated = this.periodLogs().filter(l => l.id !== id);
-    this.periodLogs.set(updated);
-    this.saveLocalLogs(updated);
-    this.calculateCyclePredictions();
-    this.generateCalendar();
-    this.showToast('Period log deleted.');
 
-    this.cycleService.deletePeriod(id).subscribe();
+    this.cycleService.deletePeriod(id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          // Immediately sync shared partner data
+          this.partnerService.syncSharedData().catch((err) => console.warn('Partner sync error:', err));
+
+          this.showToast('Period log deleted from Firestore.');
+          this.updateSelectedDateInfo();
+        } else {
+          alert(res.message || 'Failed to delete period log.');
+        }
+      }
+    });
   }
 }
-

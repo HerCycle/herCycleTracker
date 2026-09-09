@@ -103,10 +103,10 @@
     border-radius: 50%;
     
     &.period { background: #ff4f79; }
-    &.predicted { background: #ffa8ba; border: 1.5px dashed #ff4f79; }
+    &.predicted { background: #fff0f3; border: 1.5px dashed #ff4f79; }
     &.ovulation { background: #9f7aea; box-shadow: 0 0 4px rgba(159, 122, 234, 0.6); }
     &.fertile { background: #48bb78; }
-    &.safe { background: #319795; }
+    &.lower-fertility { background: #319795; }
   }
 }
 
@@ -163,39 +163,54 @@
     opacity: 0.35;
   }
 
-  /* Status Highlight Overrides */
-  &.has-safe {
-    background: rgba(230, 255, 250, 0.8);
-    border-color: rgba(49, 151, 149, 0.3);
-    .day-num { color: #234e52; }
+  /* Status Highlight Overrides with Strict Priority */
+  
+  /* Priority 5: Lower Fertility Days - Clean white background, NO heavy teal fill */
+  &.has-lower-fertility {
+    background: #ffffff;
+    border-color: rgba(226, 232, 240, 0.9);
+    .day-num { color: #2d3748; }
   }
 
+  /* Priority 4: Fertile Window - Light green tint */
   &.has-fertile {
-    background: rgba(240, 253, 244, 0.9);
-    border-color: rgba(72, 187, 120, 0.4);
-    .day-num { color: #22543d; }
+    background: rgba(240, 253, 244, 0.85);
+    border: 1px solid rgba(72, 187, 120, 0.45);
+    .day-num { color: #22543d; font-weight: 700; }
   }
 
+  /* Priority 3: Ovulation Day - Purple accent */
   &.has-ovulation {
     background: rgba(250, 245, 255, 0.95);
     border: 2px solid #9f7aea;
-    box-shadow: 0 0 10px rgba(159, 122, 234, 0.25);
-    .day-num { color: #553c9a; font-size: 1.05rem; }
+    box-shadow: 0 0 8px rgba(159, 122, 234, 0.25);
+    .day-num { color: #553c9a; font-weight: 800; }
   }
 
+  /* Priority 2: Predicted Period - Light pink tint with dashed border */
   &.has-predicted {
-    background: rgba(255, 245, 247, 0.8);
-    border: 1.5px dashed #ff4f79;
+    background: rgba(255, 240, 243, 0.75);
+    border: 1.5px dashed #ff758c;
+    .day-num { color: #d6336c; font-weight: 700; }
   }
 
+  /* Priority 1: Logged Period - Strongest pink/red filled gradient */
   &.has-period {
-    background: linear-gradient(135deg, #ff4f79, #ff758c);
-    border-color: transparent;
-    box-shadow: 0 4px 12px rgba(255, 79, 121, 0.3);
+    background: linear-gradient(135deg, #ff4f79, #e0245e);
+    border: 1px solid transparent;
+    box-shadow: 0 4px 12px rgba(224, 36, 94, 0.3);
     
     .day-num {
       color: #ffffff;
+      font-weight: 800;
     }
+  }
+
+  /* Selected Cell Highlight Ring (preserves underlying status styling) */
+  &.is-selected {
+    box-shadow: 0 0 0 3px #ff4f79, 0 6px 16px rgba(255, 79, 121, 0.25);
+    transform: translateY(-2px) scale(1.05);
+    z-index: 2;
   }
 }
 
@@ -212,9 +227,179 @@
     border-radius: 50%;
     
     &.period { background: #ffffff; }
-    &.predicted { background: #ff4f79; }
+    &.predicted { background: transparent; border: 1px dashed #ff4f79; }
     &.ovulation { background: #9f7aea; }
     &.fertile { background: #38a169; }
+    &.lower-fertility { background: #319795; }
+  }
+}
+
+/* Selected Date Inspection Panel */
+.selected-day-panel {
+  margin-top: 1.25rem;
+  padding: 1.15rem 1.35rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 182, 193, 0.4);
+  box-shadow: 0 4px 20px rgba(255, 105, 135, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: fadeIn 0.25s ease-out;
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+
+    .panel-title-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+
+      .status-badge {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        align-self: flex-start;
+
+        &.badge-logged_period {
+          background: rgba(255, 79, 121, 0.15);
+          color: #ff4f79;
+        }
+        &.badge-predicted_period {
+          background: rgba(255, 168, 186, 0.2);
+          color: #d6336c;
+          border: 1px dashed #ff758c;
+        }
+        &.badge-ovulation {
+          background: rgba(159, 122, 234, 0.15);
+          color: #805ad5;
+        }
+        &.badge-fertile {
+          background: rgba(72, 187, 120, 0.15);
+          color: #276749;
+        }
+        &.badge-lower_fertility {
+          background: rgba(49, 151, 149, 0.12);
+          color: #285e61;
+        }
+        &.badge-outside_tracked_range {
+          background: #edf2f7;
+          color: #718096;
+        }
+      }
+
+      .selected-date-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #2d3748;
+        margin: 0;
+      }
+    }
+
+    .cycle-day-pill {
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0.3rem 0.75rem;
+      background: linear-gradient(135deg, rgba(255, 79, 121, 0.15), rgba(255, 117, 140, 0.15));
+      color: #ff4f79;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+  }
+
+  .panel-meta-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: rgba(247, 250, 252, 0.8);
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+
+      .meta-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #718096;
+        text-transform: uppercase;
+      }
+      .meta-value {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #2d3748;
+
+        &.fertility-val {
+          &.level-high { color: #805ad5; font-weight: 800; }
+          &.level-elevated { color: #276749; font-weight: 800; }
+          &.level-lower { color: #319795; }
+          &.level-unknown { color: #718096; }
+        }
+      }
+    }
+  }
+
+  .panel-description {
+    font-size: 0.85rem;
+    color: #4a5568;
+    line-height: 1.45;
+    margin: 0;
+  }
+
+  .panel-disclaimer {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: #a0aec0;
+    margin: 0;
+    padding-top: 0.2rem;
+
+    .disclaimer-icon {
+      font-size: 0.95rem;
+      color: #cbd5e0;
+    }
+  }
+
+  .panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.25rem;
+
+    .btn-primary-soft {
+      background: linear-gradient(135deg, rgba(255, 79, 121, 0.12), rgba(255, 117, 140, 0.12));
+      color: #ff4f79;
+      border: 1px solid rgba(255, 79, 121, 0.3);
+      padding: 0.45rem 0.9rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      span.material-icons {
+        font-size: 1rem;
+      }
+
+      &:hover {
+        background: #ff4f79;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(255, 79, 121, 0.25);
+      }
+    }
   }
 }
 
@@ -266,6 +451,25 @@
         color: #a0aec0;
         font-weight: 500;
       }
+    }
+  }
+
+  .cycle-variation-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: #718096;
+    margin: 0.75rem 0 0 0;
+    padding: 0.45rem 0.7rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 182, 193, 0.25);
+
+    span.material-icons {
+      font-size: 1rem;
+      color: #ff4f79;
+      flex-shrink: 0;
     }
   }
 }
@@ -391,8 +595,14 @@
         font-weight: 800;
         background: rgba(159, 122, 234, 0.15);
         color: #805ad5;
-        padding: 0.1rem 0.5rem;
+        padding: 0.12rem 0.55rem;
         border-radius: 10px;
+        white-space: nowrap;
+
+        &.current-cycle {
+          background: rgba(255, 79, 121, 0.15);
+          color: #ff4f79;
+        }
       }
 
       .notes-text {

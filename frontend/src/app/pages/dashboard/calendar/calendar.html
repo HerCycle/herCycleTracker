@@ -25,9 +25,9 @@
     <div class="calendar-legend">
       <div class="legend-item"><span class="color-dot period"></span><span>Logged Period</span></div>
       <div class="legend-item"><span class="color-dot predicted"></span><span>Predicted Period</span></div>
-      <div class="legend-item"><span class="color-dot ovulation"></span><span>Ovulation Day</span></div>
+      <div class="legend-item"><span class="color-dot ovulation"></span><span>Ovulation</span></div>
       <div class="legend-item"><span class="color-dot fertile"></span><span>Fertile Window</span></div>
-      <div class="legend-item"><span class="color-dot safe"></span><span>Safe Days</span></div>
+      <div class="legend-item"><span class="color-dot lower-fertility"></span><span>Lower Fertility</span></div>
     </div>
 
     <!-- Weekday titles -->
@@ -44,25 +44,79 @@
           class="day-cell" 
           (click)="onDayCellClick(day)"
           [class.not-current]="!day.isCurrentMonth"
+          [class.is-selected]="selectedDate() === day.dateStr"
           [class.has-period]="day.isPeriod"
           [class.has-predicted]="day.isPredicted"
           [class.has-ovulation]="day.isOvulation"
           [class.has-fertile]="day.isFertile"
-          [class.has-safe]="day.isSafe"
-          [title]="day.isPeriod ? 'Logged Period Date' : day.isOvulation ? 'Predicted Ovulation Day' : 'Click to log period on ' + day.dateStr"
+          [class.has-lower-fertility]="day.isLowerFertility"
+          [attr.aria-label]="day.ariaLabel"
+          [title]="day.titleTooltip"
         >
           <span class="day-num">{{ day.dayNum }}</span>
           
           <!-- Indicators dots below numbers -->
           <div class="cell-dots">
             @if (day.isPeriod) { <span class="dot period"></span> }
-            @if (day.isPredicted) { <span class="dot predicted"></span> }
-            @if (day.isOvulation) { <span class="dot ovulation"></span> }
-            @if (day.isFertile && !day.isPeriod && !day.isPredicted) { <span class="dot fertile"></span> }
+            @else if (day.isPredicted) { <span class="dot predicted"></span> }
+            @else if (day.isOvulation) { <span class="dot ovulation"></span> }
+            @else if (day.isFertile) { <span class="dot fertile"></span> }
+            @else if (day.isLowerFertility) { <span class="dot lower-fertility"></span> }
           </div>
         </div>
       }
     </div>
+
+    <!-- Selected Date Inspection Panel -->
+    @if (selectedDateInfo(); as info) {
+      <div class="selected-day-panel glass-panel" [ngClass]="'status-' + info.status.toLowerCase()">
+        <div class="panel-header">
+          <div class="panel-title-area">
+            <span class="status-badge" [ngClass]="'badge-' + info.status.toLowerCase()">
+              {{ info.title }}
+            </span>
+            <h4 class="selected-date-title">{{ info.dateStr | date:'fullDate' }}</h4>
+          </div>
+          @if (info.cycleDay) {
+            <span class="cycle-day-pill">Cycle Day {{ info.cycleDay }}</span>
+          }
+        </div>
+
+        <div class="panel-meta-row">
+          <div class="meta-item">
+            <span class="meta-label">Cycle Phase</span>
+            <span class="meta-value">{{ info.phase }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Fertility Likelihood</span>
+            <span class="meta-value fertility-val" [ngClass]="'level-' + info.fertilityLevel.toLowerCase()">
+              {{ getFertilityLabel(info.fertilityLevel) }}
+            </span>
+          </div>
+        </div>
+
+        <p class="panel-description">{{ info.description }}</p>
+
+        <p class="panel-disclaimer">
+          <span class="material-icons disclaimer-icon">info</span>
+          <span>Cycle predictions are estimates and should not be used as contraception.</span>
+        </p>
+
+        <div class="panel-actions">
+          @if (info.status === 'LOGGED_PERIOD' && info.logId) {
+            <button class="btn btn-outline btn-sm" (click)="openEditLogModalById(info.logId)">
+              <span class="material-icons">edit</span>
+              <span>Edit Period Log</span>
+            </button>
+          } @else {
+            <button class="btn btn-primary-soft btn-sm" (click)="openLogModalForDate(info.dateStr)">
+              <span class="material-icons">add_circle</span>
+              <span>Log period on this date</span>
+            </button>
+          }
+        </div>
+      </div>
+    }
   </div>
 
   <!-- Right Side: Cycle Summary & Log History -->
@@ -75,21 +129,27 @@
         <div class="stat-box">
           <span class="stat-label">Next Period</span>
           <span class="stat-val primary-text">
-            @if (daysUntilNextPeriod() !== null) {
+            @if (isLoading()) {
+              Syncing...
+            } @else if (daysUntilNextPeriod() !== null) {
               {{ daysUntilNextPeriod() }} Days
             } @else {
               Pending
             }
           </span>
-          <span class="stat-sub">{{ nextPeriodDate() | date:'mediumDate' }}</span>
+          <span class="stat-sub">{{ isLoading() ? 'Syncing with Firestore' : (nextPeriodDate() ? (nextPeriodDate() | date:'mediumDate') : 'No logs recorded') }}</span>
         </div>
 
         <div class="stat-box">
           <span class="stat-label">Avg Cycle</span>
           <span class="stat-val">{{ avgCycleLength() }} Days</span>
-          <span class="stat-sub">Regular Rhythm</span>
+          <span class="stat-sub">{{ regularityStatusText() }}</span>
         </div>
       </div>
+      <p class="cycle-variation-hint">
+        <span class="material-icons">info_outline</span>
+        <span>Cycles can vary naturally from month to month. Predictions update using your logged history.</span>
+      </p>
     </div>
 
     <div class="history-header">
@@ -101,14 +161,20 @@
     </div>
 
     <div class="history-list">
-      @if (periodLogs().length === 0) {
+      @if (isLoading()) {
+        <div class="empty-history" style="padding: 1.5rem; text-align: center;">
+          <span class="material-icons empty-icon" style="animation: spin 1s linear infinite;">sync</span>
+          <h4>Loading cycle logs...</h4>
+          <p>Syncing your menstrual history with Firestore.</p>
+        </div>
+      } @else if (periodLogs().length === 0) {
         <div class="empty-history">
           <span class="material-icons empty-icon">history_toggle_off</span>
           <h4>No cycle logs found</h4>
           <p>Tap "Log Period" above or click any date on the calendar to record your cycle!</p>
         </div>
       } @else {
-        @for (log of periodLogs(); track log.id) {
+        @for (log of periodLogsWithHistory(); track log.id) {
           <div class="history-item glass-panel">
             <div class="item-main">
               <span class="material-icons cycle-icon">water_drop</span>
@@ -125,7 +191,9 @@
                   @if (log.flow) {
                     <span class="flow-chip">{{ log.flow }} FLOW</span>
                   }
-                  <span class="cycle-chip">{{ log.cycleLength || 28 }}D CYCLE</span>
+                  <span class="cycle-chip" [class.current-cycle]="log.isCurrentCycle">
+                    {{ log.cycleLengthDisplay }}
+                  </span>
                   @if (log.notes) {
                     <span class="notes-text">"{{ log.notes }}"</span>
                   }
@@ -173,6 +241,7 @@
               id="startDate" 
               [ngModel]="startDate()"
               (ngModelChange)="startDate.set($event)"
+              [max]="todayDateStr"
               required
             />
           </div>
@@ -196,8 +265,8 @@
                 id="cycleLen" 
                 [ngModel]="cycleLength()"
                 (ngModelChange)="cycleLength.set($event)"
-                min="20"
-                max="45"
+                min="15"
+                max="60"
                 placeholder="28"
               />
             </div>
@@ -210,7 +279,7 @@
                 [ngModel]="periodLength()"
                 (ngModelChange)="periodLength.set($event)"
                 min="1"
-                max="10"
+                max="15"
                 placeholder="5"
               />
             </div>
@@ -228,6 +297,17 @@
               <option value="HEAVY">Heavy</option>
               <option value="SPOTTING">Spotting</option>
             </select>
+          </div>
+
+          <div class="input-group">
+            <label for="notes">Notes (Optional)</label>
+            <input 
+              type="text" 
+              id="notes" 
+              placeholder="e.g. Symptoms, mood, cramps"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+            />
           </div>
         </div>
 

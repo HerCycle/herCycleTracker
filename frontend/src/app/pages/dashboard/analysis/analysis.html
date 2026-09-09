@@ -1,0 +1,603 @@
+<div class="analysis-page-container">
+
+  <!-- ============================================== -->
+  <!-- HEADER & FILTER TOOLBAR                         -->
+  <!-- ============================================== -->
+  <header class="analysis-header-card glass-panel">
+    <div class="header-main-row">
+      <div class="header-title-block">
+        <div class="title-with-badge">
+          <span class="material-icons header-icon">insights</span>
+          <h2>Cycle Analysis</h2>
+        </div>
+        <p class="header-subtitle">
+          Personalized cycle trends and patterns calculated directly from your private period and symptom history.
+        </p>
+      </div>
+
+      <div class="privacy-pill">
+        <span class="material-icons">lock</span>
+        <span>Private &bull; Not a medical diagnosis</span>
+      </div>
+    </div>
+
+    <!-- Cycle Range Filter -->
+    <div class="filter-toolbar">
+      <span class="filter-label">Filter Range:</span>
+      <div class="filter-buttons" role="group" aria-label="Cycle range filter">
+        <button
+          type="button"
+          class="btn-filter"
+          [class.active]="selectedRange() === 'all'"
+          (click)="setRangeFilter('all')"
+          aria-label="Filter all history"
+        >
+          All History
+        </button>
+        <button
+          type="button"
+          class="btn-filter"
+          [class.active]="selectedRange() === '12'"
+          (click)="setRangeFilter('12')"
+          aria-label="Filter last 12 cycles"
+        >
+          Last 12 Cycles
+        </button>
+        <button
+          type="button"
+          class="btn-filter"
+          [class.active]="selectedRange() === '6'"
+          (click)="setRangeFilter('6')"
+          aria-label="Filter last 6 cycles"
+        >
+          Last 6 Cycles
+        </button>
+        <button
+          type="button"
+          class="btn-filter"
+          [class.active]="selectedRange() === '3'"
+          (click)="setRangeFilter('3')"
+          aria-label="Filter last 3 cycles"
+        >
+          Last 3 Cycles
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================== -->
+  <!-- STATE 1: LOADING SKELETON                       -->
+  <!-- ============================================== -->
+  @if (isLoading()) {
+    <div class="loading-skeleton-grid" role="status" aria-label="Loading analysis data">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-chart"></div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- STATE 2: ERROR STATE                            -->
+  <!-- ============================================== -->
+  @else if (errorMessage()) {
+    <div class="glass-panel error-card alert alert-danger" role="alert">
+      <span class="material-icons error-icon">error_outline</span>
+      <div class="error-body">
+        <h3>{{ errorMessage() }}</h3>
+        <p>There was an issue connecting to your Firestore records. Please check your connection and try again.</p>
+        <button class="btn btn-primary btn-retry" (click)="retry()">
+          <span class="material-icons">refresh</span>
+          <span>Retry Loading Analysis</span>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- STATE 3: NO DATA (INSUFFICIENT HISTORY)         -->
+  <!-- ============================================== -->
+  @else if (!analysis()?.hasLogs) {
+    <div class="glass-panel empty-history-card">
+      <div class="empty-icon-bubble">
+        <span class="material-icons">calendar_today</span>
+      </div>
+      <h2>Build your cycle history</h2>
+      <p class="empty-desc">
+        Add a few period records to see meaningful cycle trends and patterns. Your metrics, charts, and insights will calculate automatically as your history grows.
+      </p>
+      <div class="empty-actions">
+        <a routerLink="/dashboard/calendar" class="btn btn-primary">
+          <span class="material-icons">add_circle</span>
+          <span>Add Period</span>
+        </a>
+      </div>
+      <div class="empty-reassurance">
+        <span class="material-icons">info</span>
+        <span>We never generate fake statistics or simulated data. Everything is derived strictly from your entries.</span>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- STATE 4: REAL ANALYSIS METRICS & VISUALIZATIONS -->
+  <!-- ============================================== -->
+  @else if (analysis()) {
+
+    <!-- 1. Summary Cards Grid -->
+    <section class="summary-cards-grid" aria-label="Cycle summary statistics">
+
+      <!-- Card 1: Average Cycle Length -->
+      <div class="glass-panel metric-card">
+        <div class="card-icon-wrap cycle-icon-wrap">
+          <span class="material-icons">donut_large</span>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-title">Average Cycle Length</span>
+          @if (analysis()?.averageCycleLength != null) {
+            <span class="metric-value">{{ analysis()?.averageCycleLength }} <span class="unit">days</span></span>
+            <span class="metric-subtitle">Across completed cycles</span>
+          } @else {
+            <span class="metric-value pending-text">Needs 2+ cycles</span>
+            <span class="metric-subtitle">Log consecutive periods</span>
+          }
+        </div>
+      </div>
+
+      <!-- Card 2: Average Period Length -->
+      <div class="glass-panel metric-card">
+        <div class="card-icon-wrap period-icon-wrap">
+          <span class="material-icons">water_drop</span>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-title">Average Period Length</span>
+          @if (analysis()?.averagePeriodDuration != null) {
+            <span class="metric-value">{{ analysis()?.averagePeriodDuration }} <span class="unit">days</span></span>
+            <span class="metric-subtitle">Average bleeding duration</span>
+          } @else {
+            <span class="metric-value pending-text">Not recorded</span>
+            <span class="metric-subtitle">Record duration in log</span>
+          }
+        </div>
+      </div>
+
+      <!-- Card 3: Shortest Cycle -->
+      <div class="glass-panel metric-card">
+        <div class="card-icon-wrap min-icon-wrap">
+          <span class="material-icons">arrow_downward</span>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-title">Shortest Cycle</span>
+          @if (analysis()?.shortestCycle != null) {
+            <span class="metric-value">{{ analysis()?.shortestCycle }} <span class="unit">days</span></span>
+            <span class="metric-subtitle">Minimum recorded interval</span>
+          } @else {
+            <span class="metric-value pending-text">Needs 2+ cycles</span>
+            <span class="metric-subtitle">Awaiting history</span>
+          }
+        </div>
+      </div>
+
+      <!-- Card 4: Longest Cycle -->
+      <div class="glass-panel metric-card">
+        <div class="card-icon-wrap max-icon-wrap">
+          <span class="material-icons">arrow_upward</span>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-title">Longest Cycle</span>
+          @if (analysis()?.longestCycle != null) {
+            <span class="metric-value">{{ analysis()?.longestCycle }} <span class="unit">days</span></span>
+            <span class="metric-subtitle">Maximum recorded interval</span>
+          } @else {
+            <span class="metric-value pending-text">Needs 2+ cycles</span>
+            <span class="metric-subtitle">Awaiting history</span>
+          }
+        </div>
+      </div>
+
+      <!-- Card 5: Cycle Variability -->
+      <div class="glass-panel metric-card">
+        <div class="card-icon-wrap var-icon-wrap">
+          <span class="material-icons">tune</span>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-title">Cycle Variability</span>
+          <span class="metric-value variability-status">{{ analysis()?.cycleVariabilityText }}</span>
+          <span class="metric-subtitle">
+            @if (analysis()?.cycleVariabilityDays != null) {
+              {{ analysis()?.cycleVariabilityDays }} days range
+            } @else {
+              Based on completed cycles
+            }
+          </span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 2. Charts Row: Cycle History & Period Duration Trend -->
+    <div class="charts-dual-grid">
+
+      <!-- Chart A: Historical Cycle Length Chart -->
+      <section class="glass-panel chart-panel" aria-labelledby="cycleChartTitle">
+        <div class="panel-header">
+          <div class="title-meta">
+            <h3 id="cycleChartTitle">Historical Cycle Lengths</h3>
+            <p class="subtitle">Days elapsed between consecutive period start dates</p>
+          </div>
+          <span class="chart-badge">Days</span>
+        </div>
+
+        @if (analysis()?.cycleHistoryChart && analysis()!.cycleHistoryChart.length > 0) {
+          <div class="chart-container" role="img" aria-label="Cycle history bar chart">
+            <svg viewBox="0 0 500 200" class="responsive-svg-chart" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="barGradientRose" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ff4f79" />
+                  <stop offset="100%" stop-color="#ff758c" />
+                </linearGradient>
+              </defs>
+
+              <!-- Reference Gridlines -->
+              <line x1="40" y1="30" x2="480" y2="30" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="34" font-size="10" fill="#94a3b8" text-anchor="end">35d</text>
+
+              <line x1="40" y1="80" x2="480" y2="80" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="84" font-size="10" fill="#94a3b8" text-anchor="end">28d</text>
+
+              <line x1="40" y1="130" x2="480" y2="130" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="134" font-size="10" fill="#94a3b8" text-anchor="end">21d</text>
+
+              <line x1="40" y1="170" x2="480" y2="170" stroke="#e2e8f0" stroke-width="1.5" />
+
+              <!-- Render Bars Dynamically -->
+              @for (item of analysis()?.cycleHistoryChart; track item.cycleIndex; let idx = $index, count = $count) {
+                <!-- Calculate position -->
+                <g class="bar-group">
+                  <rect
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1)) - 18"
+                    [attr.y]="170 - getCycleBarHeight(item.cycleLength)"
+                    width="36"
+                    [attr.height]="getCycleBarHeight(item.cycleLength)"
+                    rx="6"
+                    fill="url(#barGradientRose)"
+                    class="chart-bar"
+                  />
+                  <!-- Bar Value Label -->
+                  <text
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1))"
+                    [attr.y]="170 - getCycleBarHeight(item.cycleLength) - 6"
+                    font-size="11"
+                    font-weight="700"
+                    fill="#ff4f79"
+                    text-anchor="middle"
+                  >
+                    {{ item.cycleLength }}d
+                  </text>
+                  <!-- X-axis Label -->
+                  <text
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1))"
+                    y="186"
+                    font-size="10"
+                    font-weight="600"
+                    fill="#64748b"
+                    text-anchor="middle"
+                  >
+                    C{{ item.cycleIndex }}
+                  </text>
+                </g>
+              }
+            </svg>
+          </div>
+        } @else {
+          <div class="chart-empty-state">
+            <span class="material-icons">timeline</span>
+            <p>At least two logged periods are needed to calculate historical cycle lengths.</p>
+          </div>
+        }
+      </section>
+
+      <!-- Chart B: Period Duration Trend Chart -->
+      <section class="glass-panel chart-panel" aria-labelledby="periodTrendTitle">
+        <div class="panel-header">
+          <div class="title-meta">
+            <h3 id="periodTrendTitle">Period Duration Trend</h3>
+            <p class="subtitle">Days of menstrual bleeding recorded per period</p>
+          </div>
+          <span class="chart-badge">Duration</span>
+        </div>
+
+        @if (analysis()?.periodDurationTrend && analysis()!.periodDurationTrend.length >= 2) {
+          <div class="chart-container" role="img" aria-label="Period duration trend chart">
+            <svg viewBox="0 0 500 200" class="responsive-svg-chart" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="barGradientTeal" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#38b2ac" />
+                  <stop offset="100%" stop-color="#4fd1c5" />
+                </linearGradient>
+              </defs>
+
+              <!-- Reference Gridlines -->
+              <line x1="40" y1="50" x2="480" y2="50" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="54" font-size="10" fill="#94a3b8" text-anchor="end">7d</text>
+
+              <line x1="40" y1="100" x2="480" y2="100" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="104" font-size="10" fill="#94a3b8" text-anchor="end">5d</text>
+
+              <line x1="40" y1="140" x2="480" y2="140" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+              <text x="32" y="144" font-size="10" fill="#94a3b8" text-anchor="end">3d</text>
+
+              <line x1="40" y1="170" x2="480" y2="170" stroke="#e2e8f0" stroke-width="1.5" />
+
+              <!-- Render Period Duration Bars -->
+              @for (item of analysis()?.periodDurationTrend; track item.periodIndex; let idx = $index, count = $count) {
+                <g class="bar-group">
+                  <rect
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1)) - 16"
+                    [attr.y]="170 - getPeriodBarHeight(item.duration)"
+                    width="32"
+                    [attr.height]="getPeriodBarHeight(item.duration)"
+                    rx="6"
+                    fill="url(#barGradientTeal)"
+                    class="chart-bar"
+                  />
+                  <!-- Value Label -->
+                  <text
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1))"
+                    [attr.y]="170 - getPeriodBarHeight(item.duration) - 6"
+                    font-size="11"
+                    font-weight="700"
+                    fill="#319795"
+                    text-anchor="middle"
+                  >
+                    {{ item.duration }}d
+                  </text>
+                  <!-- X-axis Label -->
+                  <text
+                    [attr.x]="60 + idx * ((420 - 60) / (count > 1 ? count - 1 : 1))"
+                    y="186"
+                    font-size="10"
+                    font-weight="600"
+                    fill="#64748b"
+                    text-anchor="middle"
+                  >
+                    P{{ item.periodIndex }}
+                  </text>
+                </g>
+              }
+            </svg>
+          </div>
+        } @else {
+          <div class="chart-empty-state">
+            <span class="material-icons">water_drop</span>
+            <p>Period duration trends appear when at least 2 period logs have been recorded.</p>
+          </div>
+        }
+      </section>
+
+    </div>
+
+    <!-- 3. Middle Row: Consistency & Data-Driven Insights -->
+    <div class="consistency-insights-grid">
+
+      <!-- Section: Cycle Consistency -->
+      <section class="glass-panel consistency-card" aria-labelledby="consistencyTitle">
+        <div class="panel-header-simple">
+          <span class="material-icons consistency-icon">sync</span>
+          <h3 id="consistencyTitle">Cycle Consistency</h3>
+        </div>
+        <div class="consistency-body">
+          <div class="consistency-badge-row">
+            <span class="status-pill" [class.consistent]="analysis()?.cycleConsistencyText === 'Consistent'" [class.mostly]="analysis()?.cycleConsistencyText === 'Mostly consistent'" [class.variable]="analysis()?.cycleConsistencyText === 'Variable'">
+              {{ analysis()?.cycleConsistencyText }}
+            </span>
+          </div>
+          <p class="consistency-desc">
+            {{ analysis()?.cycleConsistencyExplanation }}
+          </p>
+          <div class="medical-disclaimer-box">
+            <span class="material-icons info-mini">info</span>
+            <p>
+              This is based on your logged patterns and is not a medical diagnosis. Cycle variations can naturally occur due to lifestyle, sleep, or stress.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Your Cycle Insights -->
+      <section class="glass-panel insights-card" aria-labelledby="insightsTitle">
+        <div class="panel-header-simple">
+          <span class="material-icons sparkle-icon">auto_awesome</span>
+          <h3 id="insightsTitle">Your Cycle Insights</h3>
+        </div>
+        <div class="insights-body">
+          @if (analysis()?.insights && analysis()!.insights.length > 0) {
+            <ul class="insights-list">
+              @for (insight of analysis()?.insights; track $index) {
+                <li class="insight-item">
+                  <span class="material-icons check-bullet">check_circle</span>
+                  <span>{{ insight }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="empty-insights-text">
+              Log additional cycles to generate detailed pattern insights based on your personal timeline.
+            </p>
+          }
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 4. Symptoms & Flow Analysis Grid -->
+    <div class="symptom-flow-grid">
+
+      <!-- Common Symptoms Analysis -->
+      <section class="glass-panel symptoms-card" aria-labelledby="symptomTitle">
+        <div class="panel-header-simple">
+          <span class="material-icons symptom-section-icon">mood</span>
+          <h3 id="symptomTitle">Common Symptoms</h3>
+        </div>
+
+        <div class="symptoms-body">
+          @if (analysis()?.hasSymptomData && analysis()?.commonSymptoms?.length) {
+            <div class="symptom-list">
+              @for (sym of analysis()?.commonSymptoms; track sym.key) {
+                <div class="symptom-row">
+                  <div class="sym-left">
+                    <span class="material-icons sym-icon">{{ sym.icon }}</span>
+                    <span class="sym-name">{{ sym.label }}</span>
+                  </div>
+                  <span class="sym-count-pill">{{ sym.count }} records</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="symptom-empty-state">
+              <span class="material-icons">sentiment_satisfied</span>
+              <p>Track symptoms for a while to discover your patterns.</p>
+              <a routerLink="/dashboard/symptoms" class="btn btn-outline btn-sm">
+                <span>Log Symptoms</span>
+              </a>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Flow Distribution Analysis -->
+      <section class="glass-panel flow-card" aria-labelledby="flowTitle">
+        <div class="panel-header-simple">
+          <span class="material-icons flow-section-icon">opacity</span>
+          <h3 id="flowTitle">Flow Analysis</h3>
+        </div>
+
+        <div class="flow-body">
+          @if (analysis()?.hasFlowData && analysis()?.flowDistribution?.length) {
+            <div class="flow-bars-list">
+              @for (item of analysis()?.flowDistribution; track item.flow) {
+                <div class="flow-progress-row">
+                  <div class="flow-label-row">
+                    <span class="flow-name">{{ item.flow }} Flow</span>
+                    <span class="flow-meta">{{ item.count }} logs ({{ item.percentage }}%)</span>
+                  </div>
+                  <div class="flow-track">
+                    <div class="flow-fill" [class.flow-light]="item.flow === 'Light'" [class.flow-medium]="item.flow === 'Medium'" [class.flow-heavy]="item.flow === 'Heavy'" [style.width.%]="item.percentage"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="flow-empty-state">
+              <span class="material-icons">water</span>
+              <p>Flow patterns will appear as you record them in your period entries.</p>
+            </div>
+          }
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 5. Recent Cycles Table -->
+    <section class="glass-panel recent-cycles-panel" aria-labelledby="recentCyclesTitle">
+      <div class="panel-header">
+        <div class="title-meta">
+          <h3 id="recentCyclesTitle">Recent Cycles</h3>
+          <p class="subtitle">Chronological history of recorded periods and observed cycle intervals</p>
+        </div>
+        <span class="record-count-badge">{{ analysis()?.recentCycles?.length || 0 }} Entries</span>
+      </div>
+
+      <div class="table-responsive-container">
+        <table class="recent-table" aria-describedby="recentCyclesTitle">
+          <thead>
+            <tr>
+              <th scope="col">Period Started</th>
+              <th scope="col">Cycle Length</th>
+              <th scope="col">Period Duration</th>
+              <th scope="col">Flow</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of analysis()?.recentCycles; track row.periodStarted) {
+              <tr>
+                <td class="date-cell">
+                  <div class="cell-flex">
+                    <span class="material-icons cell-icon">calendar_today</span>
+                    <strong>{{ formatDate(row.periodStarted) }}</strong>
+                  </div>
+                </td>
+                <td>
+                  @if (row.cycleLengthDays !== null) {
+                    <span class="cycle-pill">{{ row.cycleLengthText }}</span>
+                  } @else {
+                    <span class="muted-text">{{ row.cycleLengthText }}</span>
+                  }
+                </td>
+                <td>
+                  @if (row.periodDurationDays !== null) {
+                    <span class="duration-pill">{{ row.periodDurationText }}</span>
+                  } @else {
+                    <span class="muted-text">{{ row.periodDurationText }}</span>
+                  }
+                </td>
+                <td>
+                  @if (row.flowText !== 'Not recorded') {
+                    <span class="flow-chip">{{ row.flowText }}</span>
+                  } @else {
+                    <span class="muted-text">Not recorded</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. Estimated Fertility & Ovulation Information -->
+    <section class="glass-panel fertility-estimate-panel" aria-labelledby="fertilityTitle">
+      <div class="fertility-header">
+        <div class="fertility-icon-bubble">
+          <span class="material-icons">favorite</span>
+        </div>
+        <div>
+          <h3 id="fertilityTitle">Estimated Fertility &amp; Ovulation</h3>
+          <p class="est-tag">Estimated</p>
+        </div>
+      </div>
+
+      <div class="fertility-body">
+        <div class="estimate-cards-row">
+          <div class="estimate-box">
+            <span class="est-label">Estimated Ovulation Date</span>
+            <span class="est-val">
+              {{ formatDate(analysis()?.fertilityOvulationEstimate?.ovulationDate) }}
+            </span>
+          </div>
+
+          <div class="estimate-box">
+            <span class="est-label">Estimated Fertile Window</span>
+            <span class="est-val">
+              @if (analysis()?.fertilityOvulationEstimate?.fertileWindowStart && analysis()?.fertilityOvulationEstimate?.fertileWindowEnd) {
+                {{ formatDate(analysis()?.fertilityOvulationEstimate?.fertileWindowStart) }} &ndash;
+                {{ formatDate(analysis()?.fertilityOvulationEstimate?.fertileWindowEnd) }}
+              } @else {
+                Estimated lower chance
+              }
+            </span>
+          </div>
+        </div>
+
+        <div class="disclaimer-alert">
+          <span class="material-icons alert-icon">warning_amber</span>
+          <p>{{ analysis()?.fertilityOvulationEstimate?.disclaimer }}</p>
+        </div>
+      </div>
+    </section>
+
+  }
+
+</div>
