@@ -18,6 +18,7 @@ export class ProfilePage implements OnInit {
   // Profile Form fields
   readonly firstName = signal('');
   readonly lastName = signal('');
+  readonly email = signal('');
   readonly phone = signal('');
   readonly dateOfBirth = signal('');
   readonly height = signal<number | null>(null);
@@ -45,22 +46,31 @@ export class ProfilePage implements OnInit {
   }
 
   loadProfile(): void {
+    const user = this.auth.currentUser();
+    if (user) {
+      this.populateFields(user);
+    }
+
     this.auth.getProfile().subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          const u = res.data;
-          this.firstName.set(u.firstName);
-          this.lastName.set(u.lastName);
-          this.phone.set(u.phone || '');
-          this.dateOfBirth.set(u.dateOfBirth || '');
-          this.height.set(u.height || null);
-          this.weight.set(u.weight || null);
-          this.bloodGroup.set(u.bloodGroup || '');
-          this.pregnancyStatus.set(u.pregnancyStatus || false);
-          this.notificationsEnabled.set(u.notificationsEnabled !== false);
+          this.populateFields(res.data);
         }
       }
     });
+  }
+
+  private populateFields(u: UserProfile): void {
+    this.firstName.set(u.firstName || '');
+    this.lastName.set(u.lastName || '');
+    this.email.set(u.email || '');
+    this.phone.set(u.phone || '');
+    this.dateOfBirth.set(u.dateOfBirth || '');
+    this.height.set(u.height ?? null);
+    this.weight.set(u.weight ?? null);
+    this.bloodGroup.set(u.bloodGroup || '');
+    this.pregnancyStatus.set(!!u.pregnancyStatus);
+    this.notificationsEnabled.set(u.notificationsEnabled !== false);
   }
 
   enableEdit(): void {
@@ -75,7 +85,7 @@ export class ProfilePage implements OnInit {
   }
 
   saveProfile(): void {
-    if (!this.firstName() || !this.lastName()) {
+    if (!this.firstName().trim() || !this.lastName().trim()) {
       this.errorMessage.set('First name and Last name are required');
       return;
     }
@@ -84,14 +94,13 @@ export class ProfilePage implements OnInit {
     this.errorMessage.set(null);
     this.successMessage.set(null);
 
-    const payload: UserProfile = {
-      firstName: this.firstName(),
-      lastName: this.lastName(),
-      email: this.auth.currentUser()?.email || '',
-      phone: this.phone() || undefined,
+    const payload: Partial<UserProfile> = {
+      firstName: this.firstName().trim(),
+      lastName: this.lastName().trim(),
+      phone: this.phone().trim() || undefined,
       dateOfBirth: this.dateOfBirth() || undefined,
-      height: this.height() || undefined,
-      weight: this.weight() || undefined,
+      height: this.height() ?? undefined,
+      weight: this.weight() ?? undefined,
       bloodGroup: this.bloodGroup() || undefined,
       pregnancyStatus: this.pregnancyStatus(),
       notificationsEnabled: this.notificationsEnabled()
@@ -101,7 +110,7 @@ export class ProfilePage implements OnInit {
       next: (res) => {
         this.isSaving.set(false);
         if (res.success) {
-          this.successMessage.set('Profile updated successfully!');
+          this.successMessage.set('Profile updated successfully in Firestore!');
           this.isEditing.set(false);
           this.loadProfile();
         } else {
@@ -116,8 +125,8 @@ export class ProfilePage implements OnInit {
   }
 
   changePassword(): void {
-    if (!this.currentPassword() || !this.newPassword() || !this.confirmPassword()) {
-      this.pErrorMessage.set('All password fields are required');
+    if (!this.newPassword() || !this.confirmPassword()) {
+      this.pErrorMessage.set('New password and confirmation are required');
       return;
     }
     if (this.newPassword() !== this.confirmPassword()) {
@@ -133,14 +142,11 @@ export class ProfilePage implements OnInit {
     this.pErrorMessage.set(null);
     this.pSuccessMessage.set(null);
 
-    this.auth.changePassword({
-      oldPassword: this.currentPassword(),
-      newPassword: this.newPassword()
-    }).subscribe({
+    this.auth.changePassword(this.newPassword()).subscribe({
       next: (res) => {
         this.isChangingPassword.set(false);
         if (res.success) {
-          this.pSuccessMessage.set('Password changed successfully!');
+          this.pSuccessMessage.set('Password changed successfully in Firebase!');
           this.currentPassword.set('');
           this.newPassword.set('');
           this.confirmPassword.set('');
@@ -150,19 +156,21 @@ export class ProfilePage implements OnInit {
       },
       error: (err) => {
         this.isChangingPassword.set(false);
-        this.pErrorMessage.set(err.message || 'Current password might be incorrect.');
+        this.pErrorMessage.set(err.message || 'An error occurred while updating password.');
       }
     });
   }
 
   deleteAccount(): void {
-    if (!confirm('CAUTION: Are you sure you want to permanently delete your account? This action is irreversible and deletes all cycle history logs.')) return;
+    if (!confirm('CAUTION: Are you sure you want to permanently delete your account? This action is irreversible and permanently deletes your cycle and health records.')) return;
     
     this.auth.deleteAccount().subscribe({
       next: (res) => {
         if (res.success) {
           alert('Account deleted successfully.');
           this.router.navigate(['/login']);
+        } else {
+          alert(res.message || 'Could not delete account. You may need to log in again first.');
         }
       }
     });

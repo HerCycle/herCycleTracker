@@ -5,11 +5,14 @@
         <img src="assets/logo.jpeg" alt="HerCycle Logo" class="logo-img" />
         <h1>HerCycle</h1>
       </div>
-      <p class="subtitle">Step {{ currentStep() }} of 2: {{ currentStep() === 1 ? 'Create Account' : 'Health Profile' }}</p>
+      <p class="subtitle">
+        Step {{ currentStep() }} of 3: {{ currentStep() === 1 ? 'Create Account' : currentStep() === 2 ? 'Health Profile' : 'Period Information' }}
+      </p>
       
       <div class="step-indicator">
         <div class="step" [class.active]="currentStep() >= 1"></div>
         <div class="step" [class.active]="currentStep() >= 2"></div>
+        <div class="step" [class.active]="currentStep() >= 3"></div>
       </div>
     </div>
 
@@ -98,8 +101,22 @@
           </div>
 
           <button type="button" class="btn btn-primary btn-block" (click)="nextStep()">
-            <span>Continue</span>
+            <span>Continue to Health Profile</span>
             <span class="material-icons">arrow_forward</span>
+          </button>
+
+          <div class="auth-divider">
+            <span>OR</span>
+          </div>
+
+          <button type="button" class="btn btn-google btn-block" (click)="onGoogleSignUp()" [disabled]="isLoading()">
+            <svg class="google-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Sign up with Google</span>
           </button>
         </div>
       }
@@ -194,12 +211,136 @@
               <span class="material-icons">arrow_back</span>
               <span>Back</span>
             </button>
+            <button type="button" class="btn btn-primary" (click)="nextStep()">
+              <span>Continue to Period Tracking</span>
+              <span class="material-icons">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- STEP 3: PERIOD INFORMATION -->
+      @if (currentStep() === 3) {
+        <div class="form-step-content">
+          <div class="step-intro-banner">
+            <div class="intro-icon-wrap">
+              <span class="material-icons">water_drop</span>
+            </div>
+            <div class="intro-text">
+              <h3>Period Information</h3>
+              <p>Help us personalize your cycle predictions.</p>
+            </div>
+          </div>
+
+          <!-- 1. Last Period Start Date -->
+          <div class="input-group" [class.has-error]="periodStartDateError()">
+            <div class="label-row">
+              <label for="periodStartDate">Last period started *</label>
+            </div>
+            <input 
+              type="date" 
+              id="periodStartDate" 
+              name="periodStartDate" 
+              [ngModel]="periodStartDate()"
+              (ngModelChange)="onStartDateChange($event)"
+              [max]="todayDateStr"
+              required
+            />
+            <span class="input-hint">Your actual most recent period start date</span>
+            @if (periodStartDateError()) {
+              <div class="field-error">
+                <span class="material-icons error-icon">error</span>
+                <span>{{ periodStartDateError() }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- 2. Cycle Length & 3. Period Length -->
+          <div class="grid-layout">
+            <div class="input-group" [class.has-error]="cycleLengthError()">
+              <label for="cycleLength">Cycle length (Days) *</label>
+              <input 
+                type="number" 
+                id="cycleLength" 
+                name="cycleLength" 
+                placeholder="28"
+                [ngModel]="cycleLength()"
+                (ngModelChange)="onCycleLengthChange($event)"
+                min="15"
+                max="60"
+                required
+              />
+              <span class="input-hint">Typically 21–35 days (avg: 28)</span>
+              @if (cycleLengthError()) {
+                <div class="field-error">
+                  <span class="material-icons error-icon">error</span>
+                  <span>{{ cycleLengthError() }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="input-group" [class.has-error]="periodLengthError()">
+              <label for="periodLength">Period length (Days)</label>
+              <input 
+                type="number" 
+                id="periodLength" 
+                name="periodLength" 
+                placeholder="5"
+                [ngModel]="periodLength()"
+                (ngModelChange)="onPeriodLengthChange($event)"
+                min="1"
+                max="15"
+              />
+              <span class="input-hint">Bleeding duration (avg: 5)</span>
+              @if (periodLengthError()) {
+                <div class="field-error">
+                  <span class="material-icons error-icon">error</span>
+                  <span>{{ periodLengthError() }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 4. Flow -->
+          <div class="input-group">
+            <label for="flow">Flow (Optional)</label>
+            <select 
+              id="flow" 
+              name="flow" 
+              [ngModel]="flow()"
+              (ngModelChange)="flow.set($event)"
+            >
+              <option value="LIGHT">Light</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HEAVY">Heavy</option>
+              <option value="SPOTTING">Spotting</option>
+            </select>
+          </div>
+
+          <!-- 5. Notes -->
+          <div class="input-group">
+            <label for="notes">Notes (Optional)</label>
+            <input 
+              type="text" 
+              id="notes" 
+              name="notes" 
+              placeholder="e.g., Cramps, regular flow, headache"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+            />
+          </div>
+
+          <div class="button-row">
+            <button type="button" class="btn btn-outline" (click)="prevStep()" [disabled]="isLoading()">
+              <span class="material-icons">arrow_back</span>
+              <span>Back</span>
+            </button>
             <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
               @if (isLoading()) {
                 <span class="spinner"></span>
-                <span>Creating...</span>
+                <span>Creating Account...</span>
               } @else {
-                <span>Sign Up</span>
+                <span>Sign Up & Start Tracking</span>
                 <span class="material-icons">done</span>
               }
             </button>

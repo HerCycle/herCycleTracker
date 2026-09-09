@@ -1,0 +1,210 @@
+<div class="accept-page-wrapper">
+  <div class="accept-card glass-panel">
+
+    <!-- Header Brand -->
+    <div class="brand-header">
+      <div class="heart-icon-badge" aria-hidden="true">
+        <span class="material-icons">favorite</span>
+      </div>
+      <h2>HerCycle Partner Connection</h2>
+    </div>
+
+    <!-- 0. Loading State -->
+    @if (isLoading()) {
+      <div class="loading-box" role="status">
+        <div class="spinner"></div>
+        <p>Loading invitation details...</p>
+      </div>
+    }
+
+    <!-- 1. Unauthenticated Visitor State -->
+    @else if (!currentUser()) {
+      <div class="unauth-state">
+        <div class="icon-circle">
+          <span class="material-icons">mark_email_unread</span>
+        </div>
+        <h3>Partner Invitation</h3>
+        <p class="lead-text">You've been invited to connect on HerCycle.</p>
+        <p class="info-note">
+          The user must authenticate with the invited email. Opening the link must not automatically grant access.
+        </p>
+
+        <div class="action-buttons">
+          <a routerLink="/login" class="btn btn-primary full-width-btn">
+            <span class="material-icons">login</span>
+            <span>Sign In</span>
+          </a>
+          <a routerLink="/register" class="btn btn-outline full-width-btn">
+            <span class="material-icons">person_add</span>
+            <span>Create Account</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 2. Wrong Email Rejection (Authenticated, but email doesn't match recipient) -->
+    @else if (wrongEmailError()) {
+      <div class="error-state alert alert-danger" role="alert">
+        <span class="material-icons alert-icon">gpp_bad</span>
+        <div class="state-content">
+          <h3>Access Restricted</h3>
+          <p class="main-msg">This invitation was sent to a different email address.</p>
+          <p class="privacy-note">
+            For privacy and health data security, only the specific recipient can view and accept this invitation.
+          </p>
+        </div>
+        <div class="state-actions">
+          <button class="btn btn-primary" (click)="signOutAndSwitch()">
+            <span class="material-icons">switch_account</span>
+            <span>Sign In with Different Account</span>
+          </button>
+          <a routerLink="/dashboard/home" class="btn btn-outline">
+            <span>Return to Dashboard</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 3. Expired Invitation -->
+    @else if (expiredError()) {
+      <div class="error-state alert alert-danger" role="alert">
+        <span class="material-icons alert-icon">hourglass_disabled</span>
+        <div class="state-content">
+          <h3>Invitation Expired</h3>
+          <p class="main-msg">This partner invitation has expired.</p>
+          <p class="privacy-note">
+            Partner invitations expire after 7 days for security. Please ask your partner to send a new invitation.
+          </p>
+        </div>
+        <div class="state-actions">
+          <a routerLink="/dashboard/home" class="btn btn-outline">
+            <span>Return to Dashboard</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 4. Not Pending (Already Accepted / Declined / Cancelled) -->
+    @else if (notPendingError()) {
+      <div class="error-state alert alert-warning" role="status">
+        <span class="material-icons alert-icon">info</span>
+        <div class="state-content">
+          <h3>Invitation Not Active</h3>
+          <p class="main-msg">This invitation is no longer pending (Status: {{ notPendingError() }}).</p>
+        </div>
+        <div class="state-actions">
+          <a routerLink="/dashboard/partner-mode" class="btn btn-primary">
+            <span>Open Partner Mode</span>
+          </a>
+          <a routerLink="/dashboard/home" class="btn btn-outline">
+            <span>Return to Dashboard</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 5. Accepted Success State -->
+    @else if (acceptedSuccess()) {
+      <div class="success-state alert alert-success" role="status">
+        <span class="material-icons alert-icon">check_circle</span>
+        <div class="state-content">
+          <h3>Connected!</h3>
+          <p class="main-msg">
+            You are now connected with <strong>{{ invitation()?.senderName }}</strong>.
+          </p>
+          <p class="privacy-note">Redirecting to Partner Mode...</p>
+        </div>
+        <div class="state-actions">
+          <a routerLink="/dashboard/partner-mode" class="btn btn-primary">
+            <span>Go to Partner Mode Now</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 6. Declined Success State -->
+    @else if (declinedSuccess()) {
+      <div class="declined-state">
+        <span class="material-icons alert-icon muted">cancel</span>
+        <div class="state-content">
+          <h3>Invitation Declined</h3>
+          <p class="main-msg">You have declined this partner invitation.</p>
+        </div>
+        <div class="state-actions">
+          <a routerLink="/dashboard/home" class="btn btn-outline">
+            <span>Return to Dashboard</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- 7. Valid Pending Invitation: Explicit Accept / Decline Form -->
+    @else if (invitation()) {
+      <div class="valid-invite-form">
+        <div class="invite-summary-box">
+          <div class="sender-avatar">
+            <span class="material-icons">favorite</span>
+          </div>
+          <h3 class="connect-prompt">Connect with {{ invitation()?.senderName }}?</h3>
+          <p class="sender-sub">{{ invitation()?.senderEmail }}</p>
+          <p class="invite-desc">
+            By connecting, you'll be able to view permitted cycle and wellness updates in Partner Mode to provide empathetic, informed support.
+          </p>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="alert alert-danger" role="alert">
+            <span class="material-icons">error_outline</span>
+            <p>{{ errorMessage() }}</p>
+          </div>
+        }
+
+        <div class="explicit-actions">
+          <button
+            class="btn btn-primary full-width-btn"
+            (click)="onAccept()"
+            [disabled]="isSubmitting()"
+          >
+            @if (isSubmitting()) {
+              <span class="spinner"></span>
+              <span>Connecting...</span>
+            } @else {
+              <span class="material-icons">check</span>
+              <span>Accept Invitation</span>
+            }
+          </button>
+          <button
+            class="btn btn-outline full-width-btn"
+            (click)="onDecline()"
+            [disabled]="isSubmitting()"
+          >
+            <span class="material-icons">close</span>
+            <span>Decline</span>
+          </button>
+        </div>
+
+        <div class="security-footer-note">
+          <span class="material-icons">lock</span>
+          <span>Explicit consent required. Your partner controls what data is shared.</span>
+        </div>
+      </div>
+    }
+
+    <!-- Fallback if no invitation ID found -->
+    @else {
+      <div class="error-state">
+        <span class="material-icons alert-icon muted">help_outline</span>
+        <div class="state-content">
+          <h3>Invalid Invitation Link</h3>
+          <p class="main-msg">No partner invitation code was found in this link.</p>
+        </div>
+        <div class="state-actions">
+          <a routerLink="/dashboard/home" class="btn btn-outline">
+            <span>Go to HerCycle</span>
+          </a>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>

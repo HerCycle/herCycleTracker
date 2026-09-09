@@ -2,11 +2,21 @@
 brain/
 .idea/
 .vscode/
+.angular/
 
 # Build and dependency folders
 node_modules/
 target/
 dist/
+
+# Environment and Secret files
+.env
+.env.*
+*.pem
+*.key
+service-account*.json
+firebase-admin*.json
+credentials*.json
 
 # OS files
 .DS_Store

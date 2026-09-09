@@ -1,102 +1,256 @@
 <div class="selfcare-container">
-  
-  <!-- Navigation Header tabs -->
-  <div class="selfcare-nav-header glass-panel">
-    <div class="tabs">
-      <button class="tab-btn" [class.active]="currentTab() === 'ALL'" (click)="currentTab.set('ALL')">
-        <span class="material-icons">subscriptions</span>
-        <span>All Self Care</span>
+
+  <!-- Header Section -->
+  <header class="selfcare-header glass-panel">
+    <div class="header-badge-row">
+      <span class="wellness-badge">
+        <span class="material-icons badge-icon">spa</span>
+        Wellness & Movement Library
+      </span>
+    </div>
+
+    <div class="header-text-group">
+      <h1 class="page-title">Self Care</h1>
+      <p class="page-subtitle">
+        Helpful videos for movement, nutrition, and personal hygiene.
+      </p>
+    </div>
+
+    <!-- Health Advisory Disclaimer -->
+    <div class="health-disclaimer" role="note" aria-label="Health and wellness notice">
+      <span class="material-icons disclaimer-icon" aria-hidden="true">info</span>
+      <div class="disclaimer-content">
+        These videos are for general wellness and educational purposes. They are not a substitute for professional medical advice.
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs: All Videos vs My Bookmarks -->
+    <div class="view-tabs-row">
+      <button
+        type="button"
+        class="view-tab-btn"
+        [class.active]="currentTab() === 'ALL'"
+        (click)="setTab('ALL')"
+        aria-label="View all self care videos"
+      >
+        <span class="material-icons">video_library</span>
+        <span>All Videos ({{ allVideos().length }})</span>
       </button>
-      <button class="tab-btn" [class.active]="currentTab() === 'BOOKMARKS'" (click)="currentTab.set('BOOKMARKS')">
-        <span class="material-icons">bookmarks</span>
-        <span>My Bookmarks</span>
+
+      <button
+        type="button"
+        class="view-tab-btn"
+        [class.active]="currentTab() === 'BOOKMARKS'"
+        (click)="setTab('BOOKMARKS')"
+        aria-label="View bookmarked videos"
+      >
+        <span class="material-icons">bookmark</span>
+        <span>My Bookmarks ({{ bookmarkedIds().size }})</span>
       </button>
     </div>
-  </div>
 
-  <!-- Search and Categories Row (Visible on ALL tab) -->
-  @if (currentTab() === 'ALL') {
-    <div class="catalog-filters glass-panel">
+    <!-- Search Controls -->
+    <div class="search-bar-wrapper">
       <div class="search-box">
-        <span class="material-icons">search</span>
-        <input 
-          type="text" 
-          placeholder="Search self care videos..."
-          [(ngModel)]="searchInput"
-          (keyup.enter)="search()"
+        <label for="video-search-input" class="visually-hidden">Search self care videos</label>
+        <span class="material-icons search-icon" aria-hidden="true">search</span>
+        <input
+          id="video-search-input"
+          type="text"
+          placeholder="Search by video title, channel, topic, or category..."
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          autocomplete="off"
         />
-        @if (searchInput()) {
-          <button class="clear-search" (click)="clearSearch()">
+        @if (searchQuery()) {
+          <button
+            type="button"
+            class="clear-search-btn"
+            (click)="clearSearch()"
+            aria-label="Clear search input"
+          >
             <span class="material-icons">close</span>
           </button>
         }
       </div>
 
-      <div class="categories-row">
-        <button class="cat-pill" [class.active]="selectedCategory() === ''" (click)="setCategory('')">All</button>
-        <button class="cat-pill" [class.active]="selectedCategory() === 'NUTRITION'" (click)="setCategory('NUTRITION')">Nutrition</button>
-        <button class="cat-pill" [class.active]="selectedCategory() === 'EXERCISE'" (click)="setCategory('EXERCISE')">Exercise</button>
-        <button class="cat-pill" [class.active]="selectedCategory() === 'HYGIENE'" (click)="setCategory('HYGIENE')">Hygiene</button>
-        <button class="cat-pill" [class.active]="selectedCategory() === 'MEDITATION'" (click)="setCategory('MEDITATION')">Meditation</button>
+      @if (searchQuery() || (currentTab() === 'ALL' && selectedCategory() !== 'ALL')) {
+        <div class="active-filter-indicator">
+          <span class="filter-label">Active filters:</span>
+          @if (currentTab() === 'ALL' && selectedCategory() !== 'ALL') {
+            <span class="active-chip">{{ selectedCategory() }}</span>
+          }
+          @if (searchQuery()) {
+            <span class="active-chip">"{{ searchQuery() }}"</span>
+          }
+          <button type="button" class="btn-reset-text" (click)="resetFilters()">
+            Reset all
+          </button>
+        </div>
+      }
+    </div>
+  </header>
+
+  <!-- Category Pills / Tabs (Shown on ALL tab, horizontally scrollable on mobile) -->
+  @if (currentTab() === 'ALL') {
+    <nav class="category-nav-wrapper" aria-label="Video categories">
+      <div class="category-scroll-container">
+        @for (cat of categories; track cat.value) {
+          <button
+            type="button"
+            class="category-tab"
+            [class.active]="selectedCategory() === cat.value"
+            [attr.aria-pressed]="selectedCategory() === cat.value"
+            (click)="setCategory(cat.value)"
+          >
+            <span>{{ cat.label }}</span>
+          </button>
+        }
       </div>
+    </nav>
+  }
+
+  <!-- A. Loading State -->
+  @if (isLoading()) {
+    <div class="state-container loading-state glass-panel" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <h3>Loading Videos...</h3>
+      <p>Fetching curated wellness videos from our library.</p>
     </div>
   }
 
-  <!-- Video Grid -->
-  <div class="videos-grid">
-    @let list = currentTab() === 'ALL' ? videos() : bookmarks();
-    
-    @if (list.length === 0) {
-      <div class="empty-videos glass-panel">
-        <span class="material-icons">video_library</span>
-        <p>No self-care videos found.</p>
-      </div>
-    } @else {
-      @for (vid of list; track vid.id) {
-        <div class="video-card glass-panel glass-panel-hover" (click)="playVideo(vid)">
-          <div class="video-thumbnail-box">
-            <img [src]="getThumbnail(vid)" (error)="handleImageError($event, vid)" [alt]="vid.title" />
-            <div class="play-overlay">
-              <span class="material-icons play-icon">play_arrow</span>
+  <!-- B. Error State -->
+  @else if (errorMessage()) {
+    <div class="state-container error-state glass-panel" role="alert">
+      <span class="material-icons error-icon" aria-hidden="true">error_outline</span>
+      <h3>Unable to Load Videos</h3>
+      <p>{{ errorMessage() }}</p>
+      <button type="button" class="btn-action btn-primary" (click)="loadVideos()">
+        Try Again
+      </button>
+    </div>
+  }
+
+  <!-- C. Catalog Empty State -->
+  @else if (allVideos().length === 0) {
+    <div class="state-container empty-state glass-panel">
+      <span class="material-icons empty-icon" aria-hidden="true">video_library</span>
+      <h3>Library Empty</h3>
+      <p>No self-care videos are currently available.</p>
+      <button type="button" class="btn-action btn-primary" (click)="loadVideos()">
+        Refresh Library
+      </button>
+    </div>
+  }
+
+  <!-- D. Empty Bookmarks State -->
+  @else if (currentTab() === 'BOOKMARKS' && filteredVideos().length === 0) {
+    <div class="state-container empty-state glass-panel">
+      <span class="material-icons empty-icon" aria-hidden="true">bookmark_border</span>
+      <h3>No Bookmarked Videos Yet</h3>
+      <p>Save your favorite exercise, nutrition, and hygiene videos by clicking the bookmark icon on any card.</p>
+      <button type="button" class="btn-action btn-primary" (click)="setTab('ALL')">
+        Browse All Videos
+      </button>
+    </div>
+  }
+
+  <!-- E. Filter/Search Zero Matches State -->
+  @else if (filteredVideos().length === 0) {
+    <div class="state-container empty-state glass-panel">
+      <span class="material-icons empty-icon" aria-hidden="true">search_off</span>
+      <h3>No Videos Found</h3>
+      <p>
+        @if (searchQuery() && selectedCategory() !== 'ALL') {
+          No videos matched "<strong>{{ searchQuery() }}</strong>" in the <strong>{{ selectedCategory() }}</strong> category.
+        } @else if (searchQuery()) {
+          No videos matched your search term "<strong>{{ searchQuery() }}</strong>".
+        } @else {
+          No videos found in category <strong>{{ selectedCategory() }}</strong>.
+        }
+      </p>
+      <button type="button" class="btn-action btn-primary" (click)="resetFilters()">
+        View All Videos
+      </button>
+    </div>
+  }
+
+  <!-- F. Videos Grid -->
+  @else {
+    <main class="videos-grid" role="region" aria-label="Self care video list">
+      @for (video of filteredVideos(); track video.id || video.videoId) {
+        <article class="video-card glass-panel" (click)="openVideo(video, $event)">
+          
+          <!-- Thumbnail Media Container -->
+          <div class="card-media-wrapper">
+            <img
+              [src]="getThumbnail(video)"
+              [alt]="video.title"
+              class="video-thumbnail"
+              loading="lazy"
+              (error)="handleImageError(video)"
+            />
+
+            <!-- Play Icon Overlay -->
+            <div class="play-overlay" aria-hidden="true">
+              <div class="play-icon-circle">
+                <span class="material-icons play-icon">play_arrow</span>
+              </div>
             </div>
-            <button type="button" class="bookmark-toggle" (click)="toggleBookmark(vid, $event)" [class.active]="isBookmarked(vid)" title="Bookmark video">
-              <span class="material-icons">{{ isBookmarked(vid) ? 'bookmark' : 'bookmark_border' }}</span>
+
+            <!-- Category Badge -->
+            <span class="category-badge">{{ video.category }}</span>
+
+            <!-- Bookmark Button -->
+            <button
+              type="button"
+              class="bookmark-btn"
+              [class.active]="isBookmarked(video)"
+              (click)="toggleBookmark(video, $event)"
+              [attr.aria-label]="isBookmarked(video) ? 'Remove ' + video.title + ' from bookmarks' : 'Add ' + video.title + ' to bookmarks'"
+            >
+              <span class="material-icons">{{ isBookmarked(video) ? 'bookmark' : 'bookmark_border' }}</span>
             </button>
           </div>
 
-          <div class="video-details">
-            <span class="video-category">{{ vid.category }}</span>
-            <h4 class="video-title">{{ vid.title }}</h4>
-            <p class="video-desc">{{ vid.description }}</p>
-          </div>
-        </div>
-      }
-    }
-  </div>
+          <!-- Card Content Body -->
+          <div class="card-body">
+            @if (video.channel) {
+              <div class="channel-row">
+                <span class="channel-name">{{ video.channel }}</span>
+              </div>
+            }
 
-  <!-- Video Player Iframe Modal -->
-  @if (playingVideo() && safeEmbedUrl()) {
-    <div class="player-overlay" (click)="closeVideoPlayer()">
-      <div class="player-card glass-panel" (click)="$event.stopPropagation()">
-        <div class="player-header">
-          <h3>{{ playingVideo()?.title }}</h3>
-          <button class="close-btn" (click)="closeVideoPlayer()">
-            <span class="material-icons">close</span>
-          </button>
-        </div>
-        <div class="player-body">
-          <div class="iframe-container">
-            <iframe 
-              [src]="safeEmbedUrl()!" 
-              frameborder="0" 
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-              allowfullscreen
-            ></iframe>
+            <h2 class="video-title" [title]="video.title">
+              {{ video.title }}
+            </h2>
+
+            @if (video.description) {
+              <p class="video-desc" [title]="video.description">
+                {{ video.description }}
+              </p>
+            }
+
+            <!-- Watch on YouTube Button -->
+            <div class="card-actions">
+              <a
+                [href]="video.youtubeUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn-youtube"
+                (click)="$event.stopPropagation()"
+                [attr.aria-label]="'Watch ' + video.title + ' on YouTube (opens in new tab)'"
+              >
+                <span class="material-icons youtube-btn-icon" aria-hidden="true">play_circle</span>
+                <span class="btn-text">Watch on YouTube</span>
+                <span class="material-icons ext-link-icon" aria-hidden="true">open_in_new</span>
+              </a>
+            </div>
           </div>
-          <p class="desc">{{ playingVideo()?.description }}</p>
-        </div>
-      </div>
-    </div>
+
+        </article>
+      }
+    </main>
   }
 
 </div>

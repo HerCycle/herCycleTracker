@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profile document and all user-scoped health & habit subcollections
+    // (period_logs, symptoms, reminders, water, partner, bookmarks)
+    // Strictly private: each user can ONLY read and write their OWN documents.
+    // Partner B CANNOT write or read Owner A's private documents.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Partner Invitations:
+    // Enables secure partner invitations without exposing private user health collections.
+    match /partnerInvitations/{invitationId} {
+      // Allow read if user is sender, or recipient (matched by authenticated token email), or accepted partner
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.senderUid ||
+        (
+          request.auth.token.email != null &&
+          (
+            resource.data.recipientEmail == request.auth.token.email.lower() ||
+            resource.data.recipientEmail == request.auth.token.email
+          )
+        ) ||
+        (resource.data.partnerUid != null && resource.data.partnerUid == request.auth.uid)
+      );
+
+      // Allow creation ONLY by authenticated sender for a different recipient with PENDING status
+      // Requires expiresAt to be a future Firestore Timestamp
+      allow create: if request.auth != null &&
+        request.resource.data.senderUid == request.auth.uid &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.recipientEmail != null &&
+        request.resource.data.recipientEmail == request.resource.data.recipientEmail.lower() &&
+        (request.auth.token.email == null || request.resource.data.recipientEmail != request.auth.token.email.lower()) &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time;
+
+      // Allow update:
+      // 1. Sender can cancel pending invitation
+      // 2. Authenticated recipient can accept or decline pending invitation
+      // Strict immutability: senderUid, recipientEmail, createdAt, expiresAt CANNOT be modified.
+      // Recipient can only transition from PENDING -> ACCEPTED or PENDING -> DECLINED.
+      // Acceptance is strictly bounded by trusted server clock: request.time <= resource.data.expiresAt.
+      allow update: if request.auth != null &&
+        request.resource.data.senderUid == resource.data.senderUid &&
+        request.resource.data.recipientEmail == resource.data.recipientEmail &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        (
+          // Sender cancels pending invitation
+          (
+            request.auth.uid == resource.data.senderUid &&
+            resource.data.status == 'PENDING' &&
+            request.resource.data.status == 'CANCELLED'
+          ) ||
+          // Recipient accepts or declines
+          (
+            request.auth.token.email != null &&
+            (
+              resource.data.recipientEmail == request.auth.token.email.lower() ||
+              resource.data.recipientEmail == request.auth.token.email
+            ) &&
+            resource.data.status == 'PENDING' &&
+            (
+              // Accept: status becomes ACCEPTED, partnerUid MUST match authenticated UID
+              // Server-time expiration enforcement using trusted request.time
+              // acceptedAt MUST be trusted request.time (via serverTimestamp())
+              (
+                request.resource.data.status == 'ACCEPTED' &&
+                request.resource.data.partnerUid == request.auth.uid &&
+                request.time <= resource.data.expiresAt &&
+                request.resource.data.acceptedAt == request.time
+              ) ||
+              // Decline: status becomes DECLINED
+              request.resource.data.status == 'DECLINED'
+            )
+          )
+        );
+
+      // Sender can delete invitation
+      allow delete: if request.auth != null && request.auth.uid == resource.data.senderUid;
+    }
+
+    // Dedicated Restricted Partner Shared Data:
+    // Contains ONLY explicitly permitted cycle & wellness data.
+    // Partner has strictly READ-ONLY access when resource.data.partnerUid matches authenticated UID.
+    // Partner has ZERO write access to this document.
+    // Owner is the SOLE writer of this document.
+    match /partnerShares/{ownerUid} {
+      // Owner can read and write; authorized partner can ONLY read
+      allow read: if request.auth != null && (
+        request.auth.uid == ownerUid ||
+        (resource.data.partnerUid != null && resource.data.partnerUid == request.auth.uid)
+      );
+
+      // Owner is the ONLY writer of partnerShares/{ownerUid}
+      allow write: if request.auth != null && request.auth.uid == ownerUid;
+    }
+    
+    // Recommended care products: Publicly readable by all users, writable only by admin / server
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Self Care video library: Publicly readable by all users, writable only by admin / server
+    match /selfCareVideos/{videoId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Platform feedback submissions: Any authenticated user can submit feedback
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
+  }
+}

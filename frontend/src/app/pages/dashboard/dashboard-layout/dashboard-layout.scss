@@ -17,7 +17,10 @@
   border-left: none !important;
   border-top: none !important;
   border-bottom: none !important;
-  background: var(--bg-sidebar) !important;
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.08);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 1.5rem 1rem;
   transform: translateX(-100%);
@@ -67,7 +70,7 @@
     color: var(--text-secondary);
     cursor: pointer;
     
-    @media (max-width: 767px) {
+    @media (max-width: 1023px) {
       display: block;
     }
   }
@@ -109,17 +112,6 @@
       background: var(--gradient-primary);
       color: white;
       box-shadow: 0 4px 12px rgba(255, 100, 128, 0.2);
-    }
-  }
-
-  .admin-nav-item {
-    margin-top: 1rem;
-    border-top: 1px solid rgba(255, 100, 128, 0.1);
-    padding-top: 1rem;
-
-    a.active {
-      background: var(--gradient-secondary);
-      box-shadow: 0 4px 12px rgba(123, 44, 191, 0.2);
     }
   }
 }
@@ -187,9 +179,25 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 99;
+  cursor: pointer;
+  animation: overlayFadeIn 0.25s ease-out;
+
+  @media (min-width: 1024px) {
+    display: none;
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .main-content-wrapper {
@@ -203,13 +211,13 @@
   width: 100%;
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
-  @media (max-width: 767px) {
+  @media (max-width: 1023px) {
     padding: 1rem;
   }
 }
 
 .dashboard-shell.sidebar-open .main-content-wrapper {
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
   }

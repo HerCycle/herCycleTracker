@@ -16,13 +16,12 @@ export class ForgotPasswordPage {
   private readonly router = inject(Router);
 
   readonly email = signal('');
-  readonly resetToken = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   readonly isLoading = signal(false);
 
   onSubmit(): void {
-    if (!this.email()) {
+    if (!this.email().trim()) {
       this.errorMessage.set('Please enter your email address');
       return;
     }
@@ -30,14 +29,12 @@ export class ForgotPasswordPage {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.successMessage.set(null);
-    this.resetToken.set(null);
 
-    this.auth.forgotPassword(this.email()).subscribe({
+    this.auth.forgotPassword(this.email().trim()).subscribe({
       next: (res) => {
         this.isLoading.set(false);
         if (res.success) {
-          this.resetToken.set(res.data);
-          this.successMessage.set('Reset token generated! Copy the token and proceed to reset your password.');
+          this.successMessage.set('A password reset link has been sent to your email address! Please check your inbox.');
         } else {
           this.errorMessage.set(res.message || 'Failed to request password reset.');
         }

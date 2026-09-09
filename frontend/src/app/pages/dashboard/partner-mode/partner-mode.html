@@ -1,0 +1,249 @@
+<div class="partner-mode-container">
+
+  <!-- ============================================== -->
+  <!-- STATE 1: CONNECTION ENDED / DISCONNECTED       -->
+  <!-- ============================================== -->
+  @if (connectionEnded() || (connection() === null && !isLoading())) {
+    <div class="glass-panel disconnected-state-card">
+      <div class="ended-icon-wrapper">
+        <span class="material-icons ended-icon">link_off</span>
+      </div>
+      <h2>Partner connection ended</h2>
+      <p class="desc">
+        There is no active partner connection for this account, or access has been revoked by your partner.
+      </p>
+      <div class="action-row">
+        <a routerLink="/dashboard/partner" class="btn btn-primary">
+          <span class="material-icons">arrow_back</span>
+          <span>Return to Partner Portal</span>
+        </a>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- STATE 2: ACTIVE PARTNER MODE                   -->
+  <!-- ============================================== -->
+  @if (connection() !== null) {
+    <div class="partner-mode-view">
+
+      <!-- Supportive Header Card -->
+      <div class="glass-panel partner-mode-hero">
+        <div class="hero-top-row">
+          <div class="mode-badge">
+            <span class="material-icons heart-inline">favorite</span>
+            <span>Partner Mode</span>
+          </div>
+          <div class="realtime-badge">
+            <span class="pulse-dot"></span>
+            <span>Live Sync</span>
+          </div>
+        </div>
+
+        <div class="support-title-block">
+          <h1 class="partner-mode-title">Partner Mode ❤️</h1>
+          <p class="supporting-text">
+            Supporting: <strong>{{ sharedData()?.ownerName || connection()?.partnerName || 'HerCycle Member' }}</strong>
+          </p>
+        </div>
+
+        <div class="privacy-tag">
+          <span class="material-icons">lock_outline</span>
+          <span>Read-only companion view &bull; Only permitted information is visible</span>
+        </div>
+      </div>
+
+      <!-- If no shared data doc found at all -->
+      @if (!sharedData() && !isLoading()) {
+        <div class="glass-panel no-data-card">
+          <span class="material-icons info-icon">hourglass_empty</span>
+          <h3>Your partner hasn't shared cycle information yet.</h3>
+          <p>Once your partner logs a period or enables sharing permissions, this view will update automatically in real time.</p>
+        </div>
+      }
+
+      @if (sharedData()) {
+        <!-- Dynamic Metrics Grid -->
+        <div class="partner-metrics-grid">
+
+          <!-- 1. Current Cycle Card -->
+          <div class="glass-panel metric-card current-cycle-card">
+            <div class="card-header">
+              <div class="card-icon-bubble cycle-bubble">
+                <span class="material-icons">donut_large</span>
+              </div>
+              <h3 class="card-title">Current Cycle</h3>
+            </div>
+
+            <div class="card-content">
+              @if (sharedData()?.permissions?.cycle && sharedData()?.currentCycleDay) {
+                <div class="cycle-day-highlight">
+                  <span class="day-number">Cycle Day {{ sharedData()?.currentCycleDay }}</span>
+                </div>
+                <div class="phase-pill">
+                  <span class="phase-name">{{ sharedData()?.cyclePhase }}</span>
+                </div>
+                @if (sharedData()?.periodStatus) {
+                  <p class="sub-status">Status: {{ sharedData()?.periodStatus }}</p>
+                }
+              } @else if (!sharedData()?.permissions?.cycle) {
+                <div class="permission-disabled-box">
+                  <span class="material-icons lock-icon">visibility_off</span>
+                  <p>This information is not currently shared.</p>
+                </div>
+              } @else {
+                <div class="empty-metric-box">
+                  <p>Your partner hasn't shared cycle information yet.</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 2. Next Expected Period Card -->
+          <div class="glass-panel metric-card period-card">
+            <div class="card-header">
+              <div class="card-icon-bubble period-bubble">
+                <span class="material-icons">event</span>
+              </div>
+              <h3 class="card-title">Next Expected Period</h3>
+            </div>
+
+            <div class="card-content">
+              @if (sharedData()?.permissions?.predictions && sharedData()?.nextPeriodDate) {
+                <div class="date-highlight">
+                  {{ formatDisplayDate(sharedData()?.nextPeriodDate) }}
+                </div>
+                <p class="metric-note">Forecasted start of upcoming cycle</p>
+              } @else if (!sharedData()?.permissions?.predictions) {
+                <div class="permission-disabled-box">
+                  <span class="material-icons lock-icon">visibility_off</span>
+                  <p>This information is not currently shared.</p>
+                </div>
+              } @else {
+                <div class="empty-metric-box">
+                  <p>Your partner hasn't shared cycle information yet.</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 3. Estimated Ovulation Card -->
+          <div class="glass-panel metric-card ovulation-card">
+            <div class="card-header">
+              <div class="card-icon-bubble ovulation-bubble">
+                <span class="material-icons">auto_awesome</span>
+              </div>
+              <h3 class="card-title">Estimated Ovulation</h3>
+            </div>
+
+            <div class="card-content">
+              @if (sharedData()?.permissions?.fertility && sharedData()?.ovulationDate) {
+                <div class="date-highlight">
+                  {{ formatDisplayDate(sharedData()?.ovulationDate) }}
+                </div>
+                <p class="metric-note">Mid-cycle ovulation estimate</p>
+              } @else if (!sharedData()?.permissions?.fertility) {
+                <div class="permission-disabled-box">
+                  <span class="material-icons lock-icon">visibility_off</span>
+                  <p>This information is not currently shared.</p>
+                </div>
+              } @else {
+                <div class="empty-metric-box">
+                  <p>Your partner hasn't shared cycle information yet.</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 4. Estimated Fertile Window Card -->
+          <div class="glass-panel metric-card fertile-card">
+            <div class="card-header">
+              <div class="card-icon-bubble fertile-bubble">
+                <span class="material-icons">favorite_border</span>
+              </div>
+              <h3 class="card-title">Estimated Fertile Window</h3>
+            </div>
+
+            <div class="card-content">
+              @if (sharedData()?.permissions?.fertility && sharedData()?.fertileWindowStart) {
+                <div class="date-highlight range-highlight">
+                  {{ formatDateRange(sharedData()?.fertileWindowStart, sharedData()?.fertileWindowEnd) }}
+                </div>
+                <p class="metric-note">Estimated peak fertility timeframe</p>
+              } @else if (!sharedData()?.permissions?.fertility) {
+                <div class="permission-disabled-box">
+                  <span class="material-icons lock-icon">visibility_off</span>
+                  <p>This information is not currently shared.</p>
+                </div>
+              } @else {
+                <div class="empty-metric-box">
+                  <p>Your partner hasn't shared cycle information yet.</p>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 5. How You Can Support Section -->
+        <div class="glass-panel support-guidance-card">
+          <div class="support-header">
+            <div class="card-icon-bubble heart-bubble">
+              <span class="material-icons">spa</span>
+            </div>
+            <div>
+              <h3>How You Can Support</h3>
+              <p class="support-subtitle">Thoughtful suggestions based on your partner's current cycle phase</p>
+            </div>
+          </div>
+
+          <div class="support-body">
+            @if (sharedData()?.permissions?.selfCare && sharedData()?.sharedSelfCare?.length) {
+              <ul class="support-tips-list">
+                @for (tip of sharedData()?.sharedSelfCare; track $index) {
+                  <li class="tip-item">
+                    <span class="material-icons check-bullet">check_circle</span>
+                    <span class="tip-text">{{ tip }}</span>
+                  </li>
+                }
+              </ul>
+            } @else if (!sharedData()?.permissions?.selfCare) {
+              <div class="permission-disabled-box">
+                <span class="material-icons lock-icon">visibility_off</span>
+                <p>This information is not currently shared.</p>
+              </div>
+            } @else {
+              <ul class="support-tips-list">
+                <li class="tip-item">
+                  <span class="material-icons check-bullet">check_circle</span>
+                  <span class="tip-text">Check in thoughtfully about how they are feeling today.</span>
+                </li>
+                <li class="tip-item">
+                  <span class="material-icons check-bullet">check_circle</span>
+                  <span class="tip-text">Encourage consistent hydration, wholesome food, and good sleep.</span>
+                </li>
+                <li class="tip-item">
+                  <span class="material-icons check-bullet">check_circle</span>
+                  <span class="tip-text">Offer loving reassurance and open, patient communication.</span>
+                </li>
+              </ul>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Partner Portal Navigation & Reassurance Footer -->
+      <div class="partner-mode-footer">
+        <div class="reassurance-text">
+          <span class="material-icons">verified_user</span>
+          <span>Cycle information is shared by your partner.</span>
+        </div>
+        <a routerLink="/dashboard/partner" class="btn btn-outline btn-sm">
+          <span>Manage Partner Portal</span>
+        </a>
+      </div>
+
+    </div>
+  }
+
+</div>

@@ -1,197 +1,98 @@
 import { Injectable, inject } from '@angular/core';
-import { ApiService, ApiResponse } from './api.service';
-import { Observable } from 'rxjs';
+import {
+  Firestore,
+  collection,
+  collectionData
+} from '@angular/fire/firestore';
+import { Observable, throwError } from 'rxjs';
+import { map, tap, catchError } from 'rxjs/operators';
 
-export interface Product {
-  id: number;
+export interface CareProduct {
+  id?: string;
   name: string;
-  description: string;
-  price: number;
-  discount?: number;
-  stock: number;
-  rating?: number;
-  reviewsCount?: number;
   brand?: string;
-  category?: string;
+  description?: string;
   imageUrl?: string;
+  category: string;
+  amazonUrl: string;
+  flipkartUrl?: string;
+  price?: number;
+  active: boolean;
+  displayOrder: number;
 }
 
-export interface PaginatedProducts {
-  content: Product[];
-  pageable: any;
-  totalPages: number;
-  totalElements: number;
-  size: number;
-  number: number; // current page number
-}
-
-export interface CartItem {
-  id: number;
-  productId: number;
-  productName: string;
-  productImage?: string;
-  quantity: number;
-  price: number;
-  subtotal: number;
-}
-
-export interface Cart {
-  id?: number;
-  cartItems: CartItem[];
-  totalAmount: number;
-}
-
-export interface WishlistItem {
-  id: number;
-  productId: number;
-  productName: string;
-  price: number;
-  imageUrl?: string;
-}
-
-export interface Address {
-  id?: number;
-  fullName: string;
-  phone: string;
-  houseNo: string;
-  street: string;
-  city: string;
-  district: string;
-  state: string;
-  pinCode: string;
-  isDefault?: boolean;
-}
-
-export interface OrderItem {
-  id: number;
-  productId: number;
-  productName: string;
-  quantity: number;
-  price: number;
-  subtotal: number;
-}
-
-export interface Order {
-  id?: number;
-  orderNumber?: string;
-  addressId: number;
-  address?: Address;
-  paymentMethod: string; // e.g. "COD"
-  paymentStatus?: string;
-  orderStatus?: string;
-  deliveryStatus?: string;
-  orderItems?: OrderItem[];
-  subtotal?: number;
-  discountAmount?: number;
-  totalAmount?: number;
-  couponCode?: string;
-  orderDate?: string;
-}
+// Backward-compatibility aliases
+export type RecommendedProduct = CareProduct;
+export type Product = CareProduct;
 
 @Injectable({
   providedIn: 'root'
 })
 export class ShopService {
-  private readonly api = inject(ApiService);
+  private readonly firestore = inject(Firestore);
 
-  // --- Products ---
-  getProducts(page = 0, size = 10, sortBy = 'id', sortDir = 'desc'): Observable<ApiResponse<PaginatedProducts>> {
-    return this.api.get<PaginatedProducts>(`/api/products?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`);
+  /**
+   * Retrieves all care products directly from Firestore 'products' collection.
+   * Uses direct collection read without server-side composite queries to prevent index errors.
+   * Active filtering and displayOrder sorting are performed in TypeScript.
+   */
+  getProducts(): Observable<CareProduct[]> {
+    console.log('SHOP SERVICE STARTED');
+    try {
+      const colRef = collection(this.firestore, 'products');
+
+      return (collectionData(colRef, { idField: 'id' }) as Observable<CareProduct[]>).pipe(
+        tap((raw) => {
+          console.log('RAW PRODUCTS RECEIVED:', raw ? raw.length : 0);
+        }),
+        map((products) => {
+          // Normalize and filter active products
+          const active = (products || []).filter((p) => {
+            // Check boolean true or string 'true'
+            return p.active === true || (p.active as any) === 'true';
+          });
+          console.log('ACTIVE PRODUCTS:', active.length);
+
+          const cats: Record<string, number> = {};
+          active.forEach((p) => {
+            cats[p.category] = (cats[p.category] || 0) + 1;
+          });
+          console.log('PRODUCT CATEGORIES:', cats);
+
+          return active.sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+        }),
+        catchError((err) => {
+          console.error('Organic Store Firestore error:', {
+            code: err?.code,
+            message: err?.message,
+            name: err?.name,
+            details: err
+          });
+          return throwError(() => err);
+        })
+      );
+    } catch (err: any) {
+      console.error('Organic Store Firestore initialization error:', {
+        code: err?.code,
+        message: err?.message,
+        details: err
+      });
+      return throwError(() => err);
+    }
   }
 
-  searchProducts(query: string, page = 0, size = 10, sortBy = 'id', sortDir = 'desc'): Observable<ApiResponse<PaginatedProducts>> {
-    return this.api.get<PaginatedProducts>(`/api/products/search?query=${query}&page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`);
-  }
-
-  filterProducts(category: string, page = 0, size = 10, sortBy = 'id', sortDir = 'desc'): Observable<ApiResponse<PaginatedProducts>> {
-    return this.api.get<PaginatedProducts>(`/api/products/filter?category=${category}&page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`);
-  }
-
-  getProductDetails(id: number): Observable<ApiResponse<Product>> {
-    return this.api.get<Product>(`/api/products/${id}`);
-  }
-
-  addProduct(product: Partial<Product>): Observable<ApiResponse<Product>> {
-    return this.api.post<Product>('/api/products', product);
-  }
-
-  updateProduct(id: number, product: Partial<Product>): Observable<ApiResponse<Product>> {
-    return this.api.put<Product>(`/api/products/${id}`, product);
-  }
-
-  deleteProduct(id: number): Observable<ApiResponse<void>> {
-    return this.api.delete<void>(`/api/products/${id}`);
-  }
-
-  // --- Cart ---
-  getCart(): Observable<ApiResponse<Cart>> {
-    return this.api.get<Cart>('/api/cart');
-  }
-
-  addToCart(productId: number, quantity: number): Observable<ApiResponse<Cart>> {
-    return this.api.post<Cart>('/api/cart', { productId, quantity });
-  }
-
-  updateCartItem(cartItemId: number, quantity: number): Observable<ApiResponse<Cart>> {
-    return this.api.put<Cart>(`/api/cart/${cartItemId}?quantity=${quantity}`, {});
-  }
-
-  removeCartItem(cartItemId: number): Observable<ApiResponse<Cart>> {
-    return this.api.delete<Cart>(`/api/cart/${cartItemId}`);
-  }
-
-  clearCart(): Observable<ApiResponse<void>> {
-    return this.api.delete<void>('/api/cart');
-  }
-
-  // --- Wishlist ---
-  getWishlist(): Observable<ApiResponse<WishlistItem[]>> {
-    return this.api.get<WishlistItem[]>('/api/wishlist');
-  }
-
-  addToWishlist(productId: number): Observable<ApiResponse<WishlistItem>> {
-    return this.api.post<WishlistItem>(`/api/wishlist?productId=${productId}`, {});
-  }
-
-  removeFromWishlist(productId: number): Observable<ApiResponse<void>> {
-    return this.api.delete<void>(`/api/wishlist/${productId}`);
-  }
-
-  // --- Addresses ---
-  getAddresses(): Observable<ApiResponse<Address[]>> {
-    return this.api.get<Address[]>('/api/addresses');
-  }
-
-  addAddress(address: Address): Observable<ApiResponse<Address>> {
-    return this.api.post<Address>('/api/addresses', address);
-  }
-
-  updateAddress(id: number, address: Address): Observable<ApiResponse<Address>> {
-    return this.api.put<Address>(`/api/addresses/${id}`, address);
-  }
-
-  deleteAddress(id: number): Observable<ApiResponse<void>> {
-    return this.api.delete<void>(`/api/addresses/${id}`);
-  }
-
-  // --- Orders ---
-  placeOrder(orderRequest: { addressId: number; paymentMethod: string; couponCode?: string }): Observable<ApiResponse<Order>> {
-    return this.api.post<Order>('/api/orders', orderRequest);
-  }
-
-  getOrderHistory(): Observable<ApiResponse<Order[]>> {
-    return this.api.get<Order[]>('/api/orders');
-  }
-
-  trackOrder(orderId: number): Observable<ApiResponse<Order>> {
-    return this.api.get<Order>(`/api/orders/${orderId}`);
-  }
-
-  cancelOrder(orderId: number): Observable<ApiResponse<Order>> {
-    return this.api.put<Order>(`/api/orders/${orderId}/cancel`, {});
-  }
-
-  updateOrderStatus(orderId: number, status: string): Observable<ApiResponse<Order>> {
-    return this.api.put<Order>(`/api/orders/${orderId}/status?status=${status}`, {});
+  /**
+   * Retrieves active care products filtered by category.
+   * If category is null, undefined, or 'ALL', all active products are returned.
+   */
+  getProductsByCategory(category: string): Observable<CareProduct[]> {
+    return this.getProducts().pipe(
+      map((products) => {
+        if (!category || category === 'ALL') {
+          return products;
+        }
+        return products.filter((p) => p.category === category);
+      })
+    );
   }
 }

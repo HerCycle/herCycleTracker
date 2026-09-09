@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminService } from '../../../services/admin.service';
+import { FeedbackService } from '../../../services/feedback.service';
 
 @Component({
   selector: 'app-feedback',
@@ -11,7 +11,7 @@ import { AdminService } from '../../../services/admin.service';
   styleUrl: './feedback.scss'
 })
 export class FeedbackPage {
-  private readonly adminService = inject(AdminService);
+  private readonly feedbackService = inject(FeedbackService);
 
   readonly rating = signal(5);
   readonly message = signal('');
@@ -24,7 +24,7 @@ export class FeedbackPage {
   }
 
   onSubmit(): void {
-    if (!this.message()) {
+    if (!this.message().trim()) {
       this.errorMessage.set('Please enter a feedback message');
       return;
     }
@@ -33,7 +33,7 @@ export class FeedbackPage {
     this.errorMessage.set(null);
     this.successMessage.set(null);
 
-    this.adminService.submitFeedback({
+    this.feedbackService.submitFeedback({
       rating: this.rating(),
       message: this.message()
     }).subscribe({
