@@ -2,7 +2,6 @@ import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CycleService, PeriodLog, DateCycleInfo, CycleDayStatus, FertilityLevel } from '../../../services/cycle.service';
-import { PartnerService } from '../../../services/partner.service';
 import { Subscription } from 'rxjs';
 
 export interface CalendarDay {
@@ -39,7 +38,6 @@ export interface PeriodLogWithHistory extends PeriodLog {
 })
 export class CalendarPage implements OnInit, OnDestroy {
   private readonly cycleService = inject(CycleService);
-  private readonly partnerService = inject(PartnerService);
   private periodSub?: Subscription;
 
   readonly currentYear = signal(new Date().getFullYear());
@@ -472,9 +470,6 @@ export class CalendarPage implements OnInit, OnDestroy {
       next: (res) => {
         this.isSaving.set(false);
         if (res.success) {
-          // Immediately sync shared partner data
-          this.partnerService.syncSharedData().catch((err) => console.warn('Partner sync error:', err));
-
           if (isNew) {
             this.showToast(
               'Your actual period has been recorded. Future predictions will be updated using your cycle history.'
@@ -501,9 +496,6 @@ export class CalendarPage implements OnInit, OnDestroy {
     this.cycleService.deletePeriod(id).subscribe({
       next: (res) => {
         if (res.success) {
-          // Immediately sync shared partner data
-          this.partnerService.syncSharedData().catch((err) => console.warn('Partner sync error:', err));
-
           this.showToast('Period log deleted from Firestore.');
           this.updateSelectedDateInfo();
         } else {

@@ -10,9 +10,6 @@ import { SymptomsPage } from './pages/dashboard/symptoms/symptoms';
 import { RemindersPage } from './pages/dashboard/reminders/reminders';
 import { ShopPage } from './pages/dashboard/shop/shop';
 import { SelfCarePage } from './pages/dashboard/self-care/self-care';
-import { PartnerPage } from './pages/dashboard/partner/partner';
-import { PartnerModePage } from './pages/dashboard/partner-mode/partner-mode';
-import { PartnerAcceptPage } from './pages/partner-accept/partner-accept';
 import { AnalysisPage } from './pages/dashboard/analysis/analysis';
 import { FeedbackPage } from './pages/dashboard/feedback/feedback';
 import { ProfilePage } from './pages/dashboard/profile/profile';
@@ -26,7 +23,8 @@ export const routes: Routes = [
   { path: 'register', component: RegisterPage },
   { path: 'forgot-password', component: ForgotPasswordPage },
   { path: 'reset-password', component: ResetPasswordPage },
-  { path: 'partner/accept', component: PartnerAcceptPage },
+  { path: 'partner/accept', redirectTo: '', pathMatch: 'full' },
+  { path: 'partner', redirectTo: '', pathMatch: 'prefix' },
   {
     path: 'dashboard',
     component: DashboardLayout,
@@ -39,8 +37,8 @@ export const routes: Routes = [
       { path: 'reminders', component: RemindersPage },
       { path: 'shop', component: ShopPage },
       { path: 'self-care', component: SelfCarePage },
-      { path: 'partner', component: PartnerPage },
-      { path: 'partner-mode', component: PartnerModePage },
+      { path: 'partner', redirectTo: 'home', pathMatch: 'full' },
+      { path: 'partner-mode', redirectTo: 'home', pathMatch: 'full' },
       { path: 'feedback', component: FeedbackPage },
       { path: 'profile', component: ProfilePage },
       { path: '', redirectTo: 'home', pathMatch: 'full' }

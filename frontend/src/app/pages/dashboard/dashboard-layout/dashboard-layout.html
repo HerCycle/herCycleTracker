@@ -57,20 +57,6 @@
           </a>
         </li>
         <li>
-          <a routerLink="/dashboard/partner" routerLinkActive="active" (click)="onNavClick()">
-            <span class="material-icons">favorite</span>
-            <span>Partner Portal</span>
-          </a>
-        </li>
-        @if (hasPartnerConnection()) {
-          <li>
-            <a routerLink="/dashboard/partner-mode" routerLinkActive="active" (click)="onNavClick()">
-              <span class="material-icons">visibility</span>
-              <span>Partner Mode</span>
-            </a>
-          </li>
-        }
-        <li>
           <a routerLink="/dashboard/feedback" routerLinkActive="active" (click)="onNavClick()">
             <span class="material-icons">rate_review</span>
             <span>Feedback</span>
@@ -120,8 +106,6 @@
           @else if (activePath().includes('reminders')) { Pill Reminders & Water Intake }
           @else if (activePath().includes('shop')) { Organic Store }
           @else if (activePath().includes('self-care')) { Self Care }
-          @else if (activePath().includes('partner-mode')) { Partner Mode }
-          @else if (activePath().includes('partner')) { Partner Portal & Sharing }
           @else if (activePath().includes('feedback')) { Rate Our Platform }
           @else if (activePath().includes('profile')) { Profile & Security }
         </h1>

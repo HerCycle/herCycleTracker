@@ -2,7 +2,6 @@ import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
-import { PartnerService } from '../../../services/partner.service';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 
@@ -15,16 +14,13 @@ import { Subscription } from 'rxjs';
 })
 export class DashboardLayout implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
-  private readonly partnerService = inject(PartnerService);
   private readonly router = inject(Router);
 
   readonly user = this.auth.currentUser;
   readonly isSidebarOpen = signal(true);
   readonly activePath = signal('');
-  readonly hasPartnerConnection = signal(false);
 
   private routerSub?: Subscription;
-  private partnerSub?: Subscription;
 
   ngOnInit(): void {
     this.activePath.set(this.router.url);
@@ -42,20 +38,10 @@ export class DashboardLayout implements OnInit, OnDestroy {
     if (window.innerWidth < 1024) {
       this.isSidebarOpen.set(false);
     }
-
-    this.partnerSub = this.partnerService.getPartnerConnection().subscribe({
-      next: (res) => {
-        this.hasPartnerConnection.set(!!(res.success && res.data));
-      },
-      error: () => {
-        this.hasPartnerConnection.set(false);
-      }
-    });
   }
 
   ngOnDestroy(): void {
     this.routerSub?.unsubscribe();
-    this.partnerSub?.unsubscribe();
   }
 
   toggleSidebar(): void {
