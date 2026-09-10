@@ -41,7 +41,11 @@ export class LoginPage {
       next: (res) => {
         this.isLoading.set(false);
         if (res.success) {
-          this.router.navigate(['/dashboard/home']);
+          if (res.user && !this.auth.isProfileComplete(res.user)) {
+            this.router.navigate(['/register']);
+          } else {
+            this.router.navigate(['/dashboard/home']);
+          }
         } else {
           this.errorMessage.set(res.message || 'Login failed. Please check credentials.');
         }
@@ -61,7 +65,11 @@ export class LoginPage {
       next: (res) => {
         this.isLoading.set(false);
         if (res.success) {
-          this.router.navigate(['/dashboard/home']);
+          if (res.requiresOnboarding) {
+            this.router.navigate(['/register']);
+          } else {
+            this.router.navigate(['/dashboard/home']);
+          }
         } else {
           this.errorMessage.set(res.message || 'Google sign-in failed.');
         }

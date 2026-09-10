@@ -22,7 +22,8 @@ import {
   updateDoc,
   deleteDoc,
   collection,
-  addDoc
+  addDoc,
+  getDocs
 } from '@angular/fire/firestore';
 import { Observable, from, of } from 'rxjs';
 import { map, switchMap, catchError, tap } from 'rxjs/operators';
@@ -41,6 +42,8 @@ export interface UserProfile {
   notificationsEnabled?: boolean;
   cycleLength?: number;
   periodLength?: number;
+  profileComplete?: boolean;
+  photoURL?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -119,41 +122,218 @@ export class AuthService {
     );
   }
 
+  isProfileComplete(profile: UserProfile | null): boolean {
+    if (!profile) return false;
+    if (profile.profileComplete === true) return true;
+    if (profile.profileComplete === false) return false;
+    // For legacy profiles where profileComplete was not explicitly recorded:
+    return !!(profile.firstName && profile.cycleLength);
+  }
+
   // --- Google Sign-In with Firebase Auth & Firestore Profile ---
-  loginWithGoogle(): Observable<{ success: boolean; message: string; user?: UserProfile }> {
+  loginWithGoogle(): Observable<{
+    success: boolean;
+    message: string;
+    requiresOnboarding?: boolean;
+    user?: UserProfile;
+  }> {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     return from(signInWithPopup(this.auth, provider)).pipe(
       switchMap(async (credential) => {
         const uid = credential.user.uid;
-        let profile = await this.getProfileSnapshot(uid);
-        if (!profile) {
-          const fullName = credential.user.displayName || 'HerCycle Member';
+        const existingProfile = await this.getProfileSnapshot(uid);
+
+        // 1. FIRST-TIME GOOGLE USER:
+        // users/{uid} does NOT exist in Firestore.
+        if (!existingProfile) {
+          const fullName = credential.user.displayName || '';
           const nameParts = fullName.trim().split(' ');
-          const firstName = nameParts[0] || 'User';
+          const firstName = nameParts[0] || '';
           const lastName = nameParts.slice(1).join(' ') || '';
-          profile = {
+          const initialProfile: UserProfile = {
             uid,
             firstName,
             lastName,
             email: credential.user.email || '',
-            cycleLength: 28,
-            periodLength: 5,
-            notificationsEnabled: true,
+            photoURL: credential.user.photoURL || undefined,
+            profileComplete: false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
           const userDocRef = doc(this.firestore, `users/${uid}`);
-          await setDoc(userDocRef, profile);
+          await setDoc(userDocRef, initialProfile);
+          this.currentUser.set(initialProfile);
+
+          return {
+            success: true,
+            message: 'Google authentication successful. Please complete your profile.',
+            requiresOnboarding: true,
+            user: initialProfile
+          };
         }
-        this.currentUser.set(profile);
-        return { success: true, message: 'Google sign-in successful', user: profile };
+
+        // 2. INCOMPLETE PROFILE:
+        // Document exists, but onboarding was not finished.
+        if (!this.isProfileComplete(existingProfile)) {
+          this.currentUser.set(existingProfile);
+          return {
+            success: true,
+            message: 'Please complete your onboarding profile.',
+            requiresOnboarding: true,
+            user: existingProfile
+          };
+        }
+
+        // 3. EXISTING COMPLETE GOOGLE USER:
+        // Document exists and profile is complete.
+        // Do NOT show onboarding. Do NOT overwrite existing profile or period logs.
+        this.currentUser.set(existingProfile);
+        return {
+          success: true,
+          message: 'Welcome back!',
+          requiresOnboarding: false,
+          user: existingProfile
+        };
       }),
       catchError((error) => {
         const friendlyMessage = this.mapAuthErrorMessage(error);
         return of({ success: false, message: friendlyMessage });
       })
     );
+  }
+
+  // --- Complete Onboarding for Authenticated Google User ---
+  completeGoogleOnboarding(userData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    dateOfBirth?: string;
+    height?: number;
+    weight?: number;
+    bloodGroup?: string;
+    pregnancyStatus?: boolean;
+    notificationsEnabled?: boolean;
+    periodStartDate: string;
+    cycleLength: number;
+    periodLength?: number;
+    flow?: string;
+    notes?: string;
+  }): Observable<{ success: boolean; message: string; user?: UserProfile }> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      return of({ success: false, message: 'No active session found. Please sign in with Google again.' });
+    }
+
+    return from(this.executeGoogleOnboarding(user, userData)).pipe(
+      catchError((error) => {
+        const friendlyMessage = this.mapAuthErrorMessage(error);
+        return of({ success: false, message: friendlyMessage });
+      })
+    );
+  }
+
+  private async executeGoogleOnboarding(
+    user: User,
+    userData: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string;
+      dateOfBirth?: string;
+      height?: number;
+      weight?: number;
+      bloodGroup?: string;
+      pregnancyStatus?: boolean;
+      notificationsEnabled?: boolean;
+      periodStartDate: string;
+      cycleLength: number;
+      periodLength?: number;
+      flow?: string;
+      notes?: string;
+    }
+  ): Promise<{ success: boolean; message: string; user?: UserProfile }> {
+    const uid = user.uid;
+    const existingProfile = await this.getProfileSnapshot(uid);
+
+    const cycleLen = Number(userData.cycleLength) || 28;
+    const periodLen = Number(userData.periodLength) || 5;
+
+    // 1. Calculate end date for initial period log
+    let calculatedEndDate: string | null = null;
+    if (userData.periodStartDate && periodLen > 0) {
+      const parts = userData.periodStartDate.split('-').map(Number);
+      if (parts.length === 3) {
+        const startD = new Date(parts[0], parts[1] - 1, parts[2]);
+        startD.setDate(startD.getDate() + periodLen - 1);
+        const y = startD.getFullYear();
+        const m = String(startD.getMonth() + 1).padStart(2, '0');
+        const d = String(startD.getDate()).padStart(2, '0');
+        calculatedEndDate = `${y}-${m}-${d}`;
+      }
+    }
+
+    // 2. Safely check for existing period logs so existing data is NEVER overwritten
+    const periodLogColRef = collection(this.firestore, `users/${uid}/period_logs`);
+    let hasExistingPeriodLogs = false;
+    try {
+      const periodSnap = await getDocs(periodLogColRef);
+      hasExistingPeriodLogs = !periodSnap.empty;
+    } catch (e) {
+      console.warn('Could not inspect existing period logs:', e);
+    }
+
+    if (!hasExistingPeriodLogs && userData.periodStartDate) {
+      const initialPeriodPayload = {
+        periodStartDate: userData.periodStartDate,
+        periodEndDate: calculatedEndDate,
+        flow: userData.flow || 'MEDIUM',
+        notes: userData.notes?.trim() || null,
+        cycleLength: cycleLen,
+        periodLength: periodLen,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await addDoc(periodLogColRef, initialPeriodPayload);
+    }
+
+    // 3. Persist complete profile document to Firestore users/{uid}
+    const profile: UserProfile = {
+      uid,
+      firstName: userData.firstName.trim() || user.displayName?.split(' ')[0] || 'User',
+      lastName: userData.lastName.trim() || user.displayName?.split(' ').slice(1).join(' ') || '',
+      email: user.email || userData.email.trim(),
+      pregnancyStatus: !!userData.pregnancyStatus,
+      notificationsEnabled: userData.notificationsEnabled !== false,
+      cycleLength: cycleLen,
+      periodLength: periodLen,
+      profileComplete: true,
+      photoURL: user.photoURL || existingProfile?.photoURL || undefined,
+      createdAt: existingProfile?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (userData.phone?.trim()) profile.phone = userData.phone.trim();
+    else if (existingProfile?.phone) profile.phone = existingProfile.phone;
+
+    if (userData.dateOfBirth) profile.dateOfBirth = userData.dateOfBirth;
+    else if (existingProfile?.dateOfBirth) profile.dateOfBirth = existingProfile.dateOfBirth;
+
+    if (userData.height != null) profile.height = userData.height;
+    else if (existingProfile?.height != null) profile.height = existingProfile.height;
+
+    if (userData.weight != null) profile.weight = userData.weight;
+    else if (existingProfile?.weight != null) profile.weight = existingProfile.weight;
+
+    if (userData.bloodGroup) profile.bloodGroup = userData.bloodGroup;
+    else if (existingProfile?.bloodGroup) profile.bloodGroup = existingProfile.bloodGroup;
+
+    const userDocRef = doc(this.firestore, `users/${uid}`);
+    await setDoc(userDocRef, profile);
+
+    this.currentUser.set(profile);
+    return { success: true, message: 'Onboarding completed successfully', user: profile };
   }
 
   // --- Register with Firebase Auth & Firestore Profile ---
@@ -200,6 +380,7 @@ export class AuthService {
           notificationsEnabled: userData.notificationsEnabled !== false,
           cycleLength: cycleLen,
           periodLength: periodLen,
+          profileComplete: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };

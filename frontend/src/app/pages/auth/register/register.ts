@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../../../services/auth.service';
 
 @Component({
@@ -11,9 +12,13 @@ import { AuthService } from '../../../services/auth.service';
   templateUrl: './register.html',
   styleUrl: './register.scss'
 })
-export class RegisterPage {
+export class RegisterPage implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private authSubscription?: Subscription;
+
+  // Google User Onboarding Mode
+  readonly isGoogleUser = signal(false);
 
   // Step 1: Account Details, Step 2: Health Info, Step 3: Period Information
   readonly currentStep = signal(1);
@@ -52,6 +57,42 @@ export class RegisterPage {
   // Max selectable date for last period start date (cannot be future)
   readonly todayDateStr = this.getTodayDateStr();
 
+  ngOnInit(): void {
+    this.authSubscription = this.auth.user$.subscribe(async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const profile = await this.auth.getProfileSnapshot(firebaseUser.uid);
+          if (this.auth.isProfileComplete(profile)) {
+            this.router.navigate(['/dashboard/home']);
+            return;
+          }
+
+          // User is authenticated but onboarding is incomplete (first-time Google user or partial setup)
+          this.isGoogleUser.set(true);
+          const nameParts = (firebaseUser.displayName || '').trim().split(' ');
+          if (!this.firstName()) this.firstName.set(profile?.firstName || nameParts[0] || '');
+          if (!this.lastName()) this.lastName.set(profile?.lastName || nameParts.slice(1).join(' ') || '');
+          if (!this.email()) this.email.set(profile?.email || firebaseUser.email || '');
+
+          if (profile?.phone && !this.phone()) this.phone.set(profile.phone);
+          if (profile?.dateOfBirth && !this.dateOfBirth()) this.dateOfBirth.set(profile.dateOfBirth);
+          if (profile?.height != null && this.height() === null) this.height.set(profile.height);
+          if (profile?.weight != null && this.weight() === null) this.weight.set(profile.weight);
+          if (profile?.bloodGroup && !this.bloodGroup()) this.bloodGroup.set(profile.bloodGroup);
+          if (profile?.pregnancyStatus != null) this.pregnancyStatus.set(profile.pregnancyStatus);
+          if (profile?.cycleLength) this.cycleLength.set(profile.cycleLength);
+          if (profile?.periodLength) this.periodLength.set(profile.periodLength);
+        } catch (err) {
+          console.warn('Error fetching profile in RegisterPage:', err);
+        }
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.authSubscription?.unsubscribe();
+  }
+
   private getTodayDateStr(): string {
     const today = new Date();
     const y = today.getFullYear();
@@ -62,13 +103,20 @@ export class RegisterPage {
 
   nextStep(): void {
     if (this.currentStep() === 1) {
-      if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim() || !this.password()) {
-        this.errorMessage.set('Please fill in all required fields (First name, Last name, Email, Password)');
-        return;
-      }
-      if (this.password().length < 6) {
-        this.errorMessage.set('Password must be at least 6 characters');
-        return;
+      if (this.isGoogleUser()) {
+        if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim()) {
+          this.errorMessage.set('Please fill in all required fields (First name, Last name, Email)');
+          return;
+        }
+      } else {
+        if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim() || !this.password()) {
+          this.errorMessage.set('Please fill in all required fields (First name, Last name, Email, Password)');
+          return;
+        }
+        if (this.password().length < 6) {
+          this.errorMessage.set('Password must be at least 6 characters');
+          return;
+        }
       }
       this.errorMessage.set(null);
       this.currentStep.set(2);
@@ -190,23 +238,43 @@ export class RegisterPage {
       notes: this.notes().trim() || undefined
     };
 
-    this.auth.register(payload).subscribe({
-      next: (res) => {
-        this.isLoading.set(false);
-        if (res.success) {
-          this.successMessage.set('Account created successfully! Taking you to your dashboard...');
-          setTimeout(() => {
-            this.router.navigate(['/dashboard/home']);
-          }, 1200);
-        } else {
-          this.errorMessage.set(res.message || 'Registration failed.');
+    if (this.isGoogleUser()) {
+      this.auth.completeGoogleOnboarding(payload).subscribe({
+        next: (res) => {
+          this.isLoading.set(false);
+          if (res.success) {
+            this.successMessage.set('Profile setup completed! Taking you to your dashboard...');
+            setTimeout(() => {
+              this.router.navigate(['/dashboard/home']);
+            }, 1000);
+          } else {
+            this.errorMessage.set(res.message || 'Failed to complete profile onboarding.');
+          }
+        },
+        error: (err) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(err?.message || 'An error occurred while completing your profile.');
         }
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(err.message || 'An error occurred during registration.');
-      }
-    });
+      });
+    } else {
+      this.auth.register(payload).subscribe({
+        next: (res) => {
+          this.isLoading.set(false);
+          if (res.success) {
+            this.successMessage.set('Account created successfully! Taking you to your dashboard...');
+            setTimeout(() => {
+              this.router.navigate(['/dashboard/home']);
+            }, 1200);
+          } else {
+            this.errorMessage.set(res.message || 'Registration failed.');
+          }
+        },
+        error: (err) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(err?.message || 'An error occurred during registration.');
+        }
+      });
+    }
   }
 
   onGoogleSignUp(): void {
@@ -218,10 +286,20 @@ export class RegisterPage {
       next: (res) => {
         this.isLoading.set(false);
         if (res.success) {
-          this.successMessage.set('Google sign-in successful! Redirecting...');
-          setTimeout(() => {
-            this.router.navigate(['/dashboard/home']);
-          }, 800);
+          if (res.requiresOnboarding) {
+            this.isGoogleUser.set(true);
+            if (res.user) {
+              if (res.user.firstName) this.firstName.set(res.user.firstName);
+              if (res.user.lastName) this.lastName.set(res.user.lastName);
+              if (res.user.email) this.email.set(res.user.email);
+            }
+            this.successMessage.set('Google account connected! Please complete your profile.');
+          } else {
+            this.successMessage.set('Welcome back! Taking you to your dashboard...');
+            setTimeout(() => {
+              this.router.navigate(['/dashboard/home']);
+            }, 800);
+          }
         } else {
           this.errorMessage.set(res.message || 'Google sign-up failed.');
         }
