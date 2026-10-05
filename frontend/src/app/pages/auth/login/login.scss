@@ -26,17 +26,29 @@
 
   .logo {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.4rem;
     color: var(--primary-color);
 
-    .logo-img {
-      width: 44px;
-      height: 44px;
-      object-fit: cover;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(255, 107, 139, 0.3);
+    .logo-img,
+    .login-logo-img {
+      width: 130px !important;
+      height: auto !important;
+      max-width: 130px !important;
+      max-height: none !important;
+      aspect-ratio: 480 / 393;
+      object-fit: contain !important;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(255, 107, 139, 0.22);
+      transition: transform 0.3s ease;
+
+      @media (max-width: 480px) {
+        width: 115px !important;
+        max-width: 115px !important;
+        border-radius: 16px;
+      }
     }
 
     span {
@@ -51,6 +63,7 @@
       background: var(--gradient-primary);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      margin: 0;
     }
   }
 
